@@ -1,0 +1,1 @@
+{ "checker": "test", "expect": "Unexpected .only modifier" }
