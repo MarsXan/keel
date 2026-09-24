@@ -1,0 +1,12 @@
+{
+  "name": "@sample/wallet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@nestjs/common": "12.1.0",
+    "@sample/contracts": "workspace:*",
+    "@sample/kernel": "workspace:*"
+  }
+}

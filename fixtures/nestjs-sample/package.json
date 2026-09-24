@@ -1,0 +1,37 @@
+{
+  "name": "nestjs-sample",
+  "private": true,
+  "description": "Minimal clean-architecture NestJS pnpm monorepo used by keel-nestjs tests and canaries",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "arch": "depcruise apps libs --config .dependency-cruiser.cjs"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@nestjs/testing": "12.1.0",
+    "@swc/core": "1.16.2",
+    "@types/node": "24.13.6",
+    "@vitest/coverage-v8": "5.0.1",
+    "@vitest/eslint-plugin": "1.6.27",
+    "dependency-cruiser": "18.4.0",
+    "eslint": "10.11.0",
+    "eslint-plugin-boundaries": "7.2.0",
+    "globals": "17.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "unplugin-swc": "2.0.0",
+    "vitest": "5.0.1"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core"
+    ]
+  }
+}
