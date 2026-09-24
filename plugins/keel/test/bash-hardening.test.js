@@ -241,3 +241,10 @@ test('git config and git remote writes cannot pass as reads (git stops parsing o
     assert.equal(decide(c), 'allow', c);
   }
 });
+
+test('orphan branches, installs and auto-fixers by read-only roles', () => {
+  for (const c of ['git checkout --orphan scratch', 'git switch --orphan=scratch']) assert.equal(decide(c), 'deny', c);
+  const role = { role: 'keel:reviewer-standards' };
+  for (const c of ['pnpm -w add left-pad', 'npm --prefix . install left-pad', 'npx eslint --fix src', 'npx prettier --write .']) assert.equal(decide(c, role), 'deny', c);
+  assert.equal(decide('pnpm -s test', role), 'allow');
+});

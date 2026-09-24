@@ -80,18 +80,15 @@ export function filesUnder(root, rel) {
 }
 
 /**
- * Top-level directories of this repository's other worktrees.
+ * This repository's worktrees (real paths) and which one the project lives in.
  * @param {string} root
- * @returns {string[]}
+ * @returns {{ current: string | null, all: string[] }}
  */
-export function otherWorktrees(root) {
+export function worktrees(root) {
   const top = topLevel(root);
   const out = run(root, ['worktree', 'list', '--porcelain'], { allowFail: true }) ?? '';
-  return out
-    .split('\n')
-    .filter((l) => l.startsWith('worktree '))
-    .map((l) => real(l.slice(9)))
-    .filter((dir) => dir !== (top && real(top)));
+  const all = out.split('\n').filter((l) => l.startsWith('worktree ')).map((l) => real(l.slice(9)));
+  return { current: top ? real(top) : null, all };
 }
 
 /** @param {string} p */
@@ -104,12 +101,15 @@ function real(p) {
 }
 
 /**
- * Whether the project layer is committed: HEAD contains `.keel/config.json`. Until the
+ * Whether the project layer is committed: HEAD or the base branch contains
+ * `.keel/config.json` (the base branch too, so an orphan branch cannot hide it). Until the
  * owner commits it, adoption is still being set up and reviewed.
  * @param {string} root
+ * @param {string} [base]
  */
-export function layerCommitted(root) {
-  return run(root, ['cat-file', '-e', `HEAD:${prefix(root)}.keel/config.json`], { allowFail: true }) !== null;
+export function layerCommitted(root, base) {
+  const has = (/** @type {string} */ rev) => run(root, ['cat-file', '-e', `${rev}:${prefix(root)}.keel/config.json`], { allowFail: true }) !== null;
+  return has('HEAD') || (Boolean(base) && has(`refs/heads/${base}`));
 }
 
 /** @param {string} root */

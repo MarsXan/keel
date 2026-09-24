@@ -69,7 +69,7 @@ export function auditWorkingTree(root, opts) {
   findings.push(...frozenFindings(root, opts.frozenTests ?? {}, { red: Boolean(opts.redStage) }));
   // Until the owner commits the project layer, adoption (keel adopt, a stack pack) is still
   // being set up; the owner's review and commit of it is the trust anchor.
-  if (guarded.length > 0 && !amendApproved(opts.change, opts.isApproved) && layerCommitted(root)) {
+  if (guarded.length > 0 && !amendApproved(opts.change, opts.isApproved) && layerCommitted(root, opts.config.project.baseBranch)) {
     findings.push(`protected files changed without an approved amendment: ${list(guarded)}. Restore them, or run /keel:amend.`);
   }
   if (gated.length > 0) {

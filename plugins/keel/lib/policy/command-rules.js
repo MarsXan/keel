@@ -130,7 +130,7 @@ export function guardedWrite(targets, ctx, how) {
       if (homeRel !== null && rel === null && matchAny(homeRel, HOME_GUARDED)) {
         return deny(`${how} would write ${t}, a shell, git or Claude Code configuration file in the home directory.`);
       }
-      if (rel === null && ctx.inOtherWorktree?.(abs)) return deny(`${how} would write ${t}, which is in another worktree of this repository, outside the change Keel is gating.`);
+      if (ctx.inOtherWorktree?.(abs)) return deny(`${how} would write ${t}, which is in another worktree of this repository, outside the change Keel is gating.`);
       if (rel !== null && ctx.classify.touchesProtected(rel)) {
         return deny(`${how} would write ${t}, a protected Keel path. Guardrail files change only through /keel:amend (Edit tool, owner approval); Keel state is written only by Keel.`);
       }

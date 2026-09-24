@@ -85,6 +85,8 @@ function removal(abs, word, recursive, ctx) {
   if (files.length > MAX_FILES) return deny(`rm ${word} would delete ${files.length} files git keeps; delete specific paths so Keel can check them.`);
   /** @type {Decision | null} */
   let asked = null;
+  const guarded = files.find((f) => ctx.classify.isProtected(f));
+  if (guarded) return deny(`rm ${word} would delete ${guarded}, a protected guardrail file; it changes only through /keel:amend.`);
   for (const f of files) {
     const d = pathGate(f, ctx, `rm ${word} would delete ${f}`);
     if (d?.decision === 'deny') return d;

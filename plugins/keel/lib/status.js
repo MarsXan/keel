@@ -78,7 +78,7 @@ export function statusText(ctx) {
   if (ctx.adoption === 'none') return 'keel: this project has not adopted Keel (run /keel:adopt).';
   const lines = [];
   if (ctx.configErrors.length > 0) lines.push('configuration: INVALID', ...ctx.configErrors.slice(0, 5).map((e) => `  - ${e}`));
-  if (isRepo(ctx.root) && !layerCommitted(ctx.root)) lines.push('project layer: not committed yet — the owner reviews and commits it; guardrail files are protected from that commit on');
+  if (isRepo(ctx.root) && !layerCommitted(ctx.root, ctx.config.project.baseBranch)) lines.push('project layer: not committed yet — the owner reviews and commits it; guardrail files are protected from that commit on');
   const ch = ctx.change;
   if (!ch) {
     lines.push('change: none active');

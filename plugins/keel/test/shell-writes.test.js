@@ -66,3 +66,8 @@ test('keel task runs on its own, so a stage is recorded only for what ran', asyn
   }
   assert.equal((await bash(dir, 'keel task T-1 red')).code, 0);
 });
+
+test('a recursive delete may not take a protected file with it', async () => {
+  const dir = repo({ 'e2e/playwright.config.ts': 'export default {};\n', 'tools/lint/eslint.config.mjs': 'export default [];\n' });
+  for (const command of ['rm -rf e2e', 'rm -r tools']) assert.match((await bash(dir, command)).stderr, /protected guardrail file/, command);
+});

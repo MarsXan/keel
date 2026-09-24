@@ -5,10 +5,10 @@ import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
 import { readdirSync } from 'node:fs';
-import { alias, currentBranch, filesUnder, otherWorktrees } from '../git.js';
+import { alias, currentBranch, filesUnder, worktrees } from '../git.js';
 import { pushDestination } from '../git-history.js';
 import { context, ESCALATE_HINT, preToolUse } from '../io.js';
-import { classifier, toRel } from '../paths.js';
+import { classifier, realPath, toRel } from '../paths.js';
 import { evaluateBash } from '../policy/bash.js';
 import { packagesOf } from '../policy/diffaudit.js';
 import { evaluateEdit, shellWriteRule } from '../policy/edit.js';
@@ -23,13 +23,22 @@ import { join, resolve } from 'node:path';
  */
 
 /**
- * Whether a path lies inside another worktree of the repository (looked up once, lazily).
+ * Whether a path belongs to another worktree of the repository: the deepest worktree that
+ * contains its real path is not the one the project lives in. That covers a sibling
+ * worktree, one nested inside the project, and the main tree seen from a linked one.
+ * Looked up once, lazily.
  * @param {string} root
  */
 function inWorktreeOf(root) {
-  /** @type {string[] | undefined} */
+  /** @type {ReturnType<typeof worktrees> | undefined} */
   let trees;
-  return (/** @type {string} */ abs) => (trees ??= otherWorktrees(root)).some((dir) => abs === dir || abs.startsWith(`${dir}/`));
+  return (/** @type {string} */ abs) => {
+    trees ??= worktrees(root);
+    if (trees.all.length < 2) return false;
+    const target = realPath(abs);
+    const deepest = trees.all.filter((dir) => target === dir || target.startsWith(`${dir}/`)).sort((a, b) => b.length - a.length)[0];
+    return deepest !== undefined && deepest !== trees.current;
+  };
 }
 
 /** @param {Decision} d @returns {GuardResult} */

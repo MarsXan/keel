@@ -124,3 +124,10 @@ test('a package.json script changed by any route is a finding without an amendme
   assert.match(auditWorkingTree(dir, opts({ isApproved: (w) => w === 'plan' })).findings.join('\n'), /package\.json: changing the script test/);
   assert.deepEqual(auditWorkingTree(dir, opts()).findings, [], 'an approved amendment covers it');
 });
+
+test('an orphan branch does not hide guardrail changes: the base branch anchors the layer', () => {
+  const dir = gitRepo({ files: { 'CONSTITUTION.md': 'a', '.keel/config.json': '{"keel":"0.1"}' }, commit: true });
+  git(dir, ['checkout', '-q', '--orphan', 'scratch']);
+  writeFileSync(join(dir, 'CONSTITUTION.md'), 'b');
+  assert.match(auditWorkingTree(dir, opts({ isApproved: (w) => w === 'plan' })).findings.join('\n'), /protected[\s\S]*CONSTITUTION\.md/);
+});

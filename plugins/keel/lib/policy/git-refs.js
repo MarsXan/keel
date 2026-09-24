@@ -147,6 +147,9 @@ export function resetRule(args, cwd, ctx, guarded) {
  * @param {(ctx: CommandContext, abs: string) => boolean} guarded
  */
 export function checkoutRule(sub, args, cwd, ctx, guarded) {
+  if (args.some((a) => /^--orphan(=|$)/.test(a))) {
+    return deny(`git ${sub} --orphan starts a history without the project's commits, which hides every change from the audit; branch from the base branch instead.`);
+  }
   if (args.some((a) => /^(-f|--force|--discard-changes|--overwrite-ignore|-B|-C|--force-create)$/.test(a))) {
     return deny(`git ${sub} with a forcing option discards work or resets a branch; commit or move the work aside, or create a new branch.`);
   }

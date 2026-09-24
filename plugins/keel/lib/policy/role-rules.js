@@ -42,7 +42,9 @@ export function roleRule(cmd, name, role) {
     const listing = g.sub ? LISTING[g.sub] : undefined;
     if (g.sub && !READ_ONLY_GIT.has(g.sub) && !listing?.(cmd.argv.slice(g.at + 1))) return refuse(`git ${g.sub}`);
   }
-  if (['npm', 'pnpm', 'yarn', 'bun'].includes(name) && INSTALLS.test(cmd.argv[1] ?? '')) return refuse(`${name} ${cmd.argv[1]}`);
+  const install = cmd.argv.slice(1).find((a) => INSTALLS.test(a));
+  if (['npm', 'pnpm', 'yarn', 'bun'].includes(name) && install) return refuse(`${name} ${install}`);
+  if (cmd.argv.some((a) => /^--(fix|fix-dry-run=false|write)$/.test(a))) return refuse('a tool that rewrites files (--fix, --write)');
   if (commandName(cmd.argv[0]) === 'keel' && ['task', 'use', 'adopt'].includes(cmd.argv[1] ?? '')) return refuse(`keel ${cmd.argv[1]}`);
   return null;
 }

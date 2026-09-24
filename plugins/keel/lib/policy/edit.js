@@ -45,10 +45,9 @@ export function evaluateEdit(input, ctx) {
   const raw = typeof ti.file_path === 'string' ? ti.file_path : typeof ti.notebook_path === 'string' ? ti.notebook_path : '';
   if (!raw) return deny('This edit has no file path, so Keel cannot check it.');
   const abs = resolve(ctx.root, raw.replace(/\\/g, '/'));
+  if (ctx.inOtherWorktree?.(abs)) return deny(OTHER_WORKTREE);
   const rels = [...new Set([toRel(ctx.root, abs), toRel(ctx.root, realPath(abs))])].filter((r) => r !== null);
-  if (rels.length === 0) {
-    return ctx.inOtherWorktree?.(abs) ? deny(OTHER_WORKTREE) : ALLOW;
-  }
+  if (rels.length === 0) return ALLOW;
   if (ctx.configErrors.length > 0) {
     return deny(`Keel's configuration is invalid, so edits are blocked until the owner fixes .keel/config.json:\n- ${ctx.configErrors.slice(0, 5).join('\n- ')}`);
   }
