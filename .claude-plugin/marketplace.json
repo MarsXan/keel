@@ -2,7 +2,9 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "keel",
   "description": "Keel: a guardrailed agentic-coding harness for Claude Code",
-  "owner": { "name": "Mohsen" },
+  "owner": {
+    "name": "Mohsen"
+  },
   "plugins": [
     {
       "name": "keel",
@@ -10,6 +12,13 @@
       "version": "0.2.0",
       "category": "development",
       "source": "./plugins/keel"
+    },
+    {
+      "name": "keel-nestjs",
+      "description": "Keel stack pack for clean-architecture NestJS pnpm monorepos",
+      "version": "0.3.0",
+      "category": "development",
+      "source": "./plugins/keel-nestjs"
     }
   ]
 }

@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// keel-nestjs CLI launcher. The pack's commands never gate an agent action, so any
+// internal error is an ordinary failure (exit 1).
+function exit(code) {
+  process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));
+}
+
+import('../lib/cli.js')
+  .then((cli) => cli.main(process.argv.slice(2)))
+  .then((code) => exit(code))
+  .catch((err) => {
+    process.stderr.write(`keel-nestjs: internal error: ${(err && err.stack) || String(err)}\n`);
+    exit(1);
+  });
