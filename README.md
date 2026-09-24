@@ -102,6 +102,20 @@ Nine subagents, each with the fewest tools its role needs. Keel enforces roles b
 The disciplines `keel:tdd`, `keel:evidence`, `keel:escalate` and `keel:search-first` are
 model-invocable skills, preloaded into the workers that need them and named at session start.
 
+## Stack packs
+
+Keel core knows nothing about any stack. A stack pack makes its rules concrete for one kind
+of project and proves them: every rule in its checker configurations has a *canary*, a
+planted violation that the checker must reject with the rule's ID.
+
+**`keel-nestjs`** (in this marketplace) covers clean-architecture NestJS pnpm monorepos:
+dependency-cruiser as the architecture authority, a strict ESLint flat config (code-health
+caps, domain purity, suppression discipline, test integrity, a boundaries mirror), a strict
+tsconfig, a Vitest preset, six path-scoped rule files, `/keel-nestjs:new-context`, and a CI
+workflow. Install it with `claude plugin install keel-nestjs@keel`, then run
+`/keel-nestjs:adopt` in the project and `keel-nestjs canaries` to prove the setup. Details:
+[`docs/stacks/nestjs.md`](docs/stacks/nestjs.md).
+
 ## Red lines and their enforcers
 
 | Red line | Enforced by |
@@ -149,10 +163,10 @@ them and the latest results are in [`docs/evals/README.md`](docs/evals/README.md
 ## Roadmap
 
 - **0.1 guards first** — hooks, approvals, bash/edit/content policies, the stop gate.
-- **0.2 workflow** — this release: the workflow commands, the nine agents, change-file lint,
-  tier floors, task stages and the test freeze, git hooks, ledger handoffs, `keel ci`, evals.
-- **0.3 keel-nestjs** — configs, canaries, path-scoped rules and scaffolding for clean-architecture
-  NestJS pnpm monorepos.
+- **0.2 workflow** — the workflow commands, the nine agents, change-file lint, tier floors,
+  task stages and the test freeze, git hooks, ledger handoffs, `keel ci`, evals.
+- **0.3 keel-nestjs** — this release: configs proven by canaries, path-scoped rules and
+  scaffolding for clean-architecture NestJS pnpm monorepos.
 - **0.4 learning loop** — audit, lessons that become checks, amendments, metrics.
 
 The design lives in [`docs/specs/2026-09-24-keel-design.md`](docs/specs/2026-09-24-keel-design.md).

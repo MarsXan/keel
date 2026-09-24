@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.0 — keel-nestjs (unreleased)
+
+### keel-nestjs, the first stack pack
+- **Checker configurations**, installed as project files: dependency-cruiser as the
+  architecture authority (layers, bounded contexts, public-index-only access, framework-free
+  domain, no cycles, no unresolvable imports, no dev dependencies in production code); an
+  ESLint flat config (strict typed rules, file and function caps with a 200-line domain cap,
+  complexity and parameters, no `any` or `@ts-ignore`, no timers, `Date` or `Math.random` in
+  the domain, no inline config there, described and unprotected-only disables, focused,
+  skipped and assertion-less tests, and an eslint-plugin-boundaries mirror); a strict ESM
+  tsconfig; a Vitest preset (no `.only`, no empty files, every test asserts, SWC decorator
+  metadata, per-layer coverage thresholds).
+- **30 canaries**, one per rule, portable to any project with the layout;
+  `keel-nestjs canaries [--project dir]` proves every checker passes clean and rejects each.
+- **`keel-nestjs adopt`**: installs the configs, rules and CI workflow, merges paths, heavy
+  paths, protected files, caps and checks so they only tighten, adds scripts, records
+  `.keel/stack.json`, prints the pinned tool install.
+- **Six path-scoped rule files**; `/keel-nestjs:adopt`, `/keel-nestjs:new-context` (a
+  test-first context scaffold through the edit gates), `keel-nestjs:conventions`.
+- **`fixtures/nestjs-sample`**: a real ESM NestJS 12 pnpm monorepo that passes every checker
+  and hosts the canary suite.
+
+### Keel core
+- **The test freeze holds until the change is done**: tests change only in a red stage; a
+  later red may grow a frozen test but not weaken it; binary tests freeze by their bytes;
+  `/keel:approve scope tests` lifts the freeze for edits and the audit alike.
+- **What decides "green" is protected**: changing an existing `package.json` script needs an
+  approved amendment (at the edit and in the audit), checker configurations are protected by
+  default, and `paths.protected` only adds to Keel's own list.
+- **Adoption**: until the owner commits the project layer, the audit lets guardrail files
+  change (the first turn after `keel adopt` was blocked); `keel adopt --hooks` installs only
+  the git hooks; `keel doctor` reports stack drift from `.keel/stack.json`.
+- **Policy**: `rm` expands globs and checks every file under a deleted directory;
+  read-only roles parse git global options and may list branches, tags, remotes and config
+  only; `keel task` must run on its own; edits into another worktree are refused;
+  `git bisect` is allowed.
+- **Tiers and lint**: budgets count unique source and test files; concrete files meet every
+  heavy glob; T0 changes need no plan; `keel ci` skips abandoned change files and lockfiles.
+- **`/keel:amend`**, the procedure every guardrail message points to; `/keel:review` and the
+  verifier diff uncommitted and untracked work.
+
 ## 0.2.0 — workflow (unreleased)
 
 The gated pipeline on top of the 0.1 guards.
