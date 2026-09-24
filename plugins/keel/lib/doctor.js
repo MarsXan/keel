@@ -14,6 +14,7 @@ import { isRepo, run } from './git.js';
 import { gitHooksInstalled } from './githooks.js';
 import { lineCount } from './policy/content.js';
 import { APPROVALS_SANDBOX_PATH, BASH_DENY, STATE_EDIT_DENY } from './settings.js';
+import { sha256 } from './hash.js';
 
 /**
  * @typedef {{ id: string, level: 'pass' | 'warn' | 'fail', message: string }} DoctorResult
@@ -80,8 +81,39 @@ export function runDoctor(root, opts = {}) {
   add('githooks.installed', hooked ? 'pass' : 'warn', hooked ? 'git hooks re-check commit and push approvals' : 'Keel git hooks are not installed: commits and pushes made by routes the bash guard cannot see are not re-checked (run keel adopt --hooks, or add `keel git-hook <hook>` to your hooks)');
   const ignored = run(root, ['check-ignore', '-q', '.keel/state/current.json'], { allowFail: true }) !== null;
   add('gitignore.state', ignored ? 'pass' : 'fail', ignored ? '.keel/state/ is git-ignored' : 'add .keel/state/ to .gitignore');
+  checkStack(root, add);
   if (!opts.quick) checkClaudeVersion(add);
   return { results };
+}
+
+/**
+ * Files a stack pack installed (.keel/stack.json): a missing one fails, a changed one warns
+ * (an approved amendment changed it, or it drifted).
+ * @param {string} root
+ * @param {(id: string, level: DoctorResult['level'], message: string) => void} add
+ */
+function checkStack(root, add) {
+  const text = readText(join(root, '.keel/stack.json'));
+  if (text === null) return;
+  let stack;
+  try {
+    stack = JSON.parse(text);
+  } catch {
+    add('stack.drift', 'fail', '.keel/stack.json is not valid JSON');
+    return;
+  }
+  const files = stack && typeof stack.files === 'object' && stack.files ? stack.files : {};
+  const name = `${stack.name ?? 'stack pack'} ${stack.version ?? ''}`.trim();
+  const missing = [];
+  const changed = [];
+  for (const [rel, hash] of Object.entries(files)) {
+    const now = readText(join(root, rel));
+    if (now === null) missing.push(rel);
+    else if (sha256(now) !== hash) changed.push(rel);
+  }
+  if (missing.length > 0) add('stack.drift', 'fail', `${name}: missing ${missing.join(', ')}; reinstall them with the pack's adopt command`);
+  else if (changed.length > 0) add('stack.drift', 'warn', `${name}: ${changed.join(', ')} differ from the installed version (an approved amendment, or drift)`);
+  else add('stack.drift', 'pass', `${name}: ${Object.keys(files).length} files as installed`);
 }
 
 /** @param {string} root @param {string} rel @param {(id: string, level: DoctorResult['level'], message: string) => void} add */

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DEFAULT_CONFIG } from '../lib/config.js';
 import { runDoctor } from '../lib/doctor.js';
+import { sha256 } from '../lib/hash.js';
 import { editRule, keelSettings, mergeSettings, sandboxPath } from '../lib/settings.js';
 import { gitRepo, runCli, tmpDir, writeFiles } from './helpers.js';
 
@@ -101,4 +102,16 @@ test('merging keeps the project settings and adds Keel', () => {
   assert.equal(merged.sandbox.enabled, true);
   assert.equal(merged.enabledPlugins['keel@keel'], true);
   assert.deepEqual(merged.extraKnownMarketplaces.keel, { source: { source: 'directory', path: '/keel' } });
+});
+
+test('stack drift: a missing installed file fails, a changed one warns', () => {
+  const dir = gitRepo({ commit: true, files: { 'eslint.config.mjs': 'export default [];\n' } });
+  const stack = (files) => writeFiles(dir, { '.keel/stack.json': JSON.stringify({ name: 'keel-nestjs', version: '0.3.0', files }) });
+  const level = () => runDoctor(dir, { quick: true }).results.find((r) => r.id === 'stack.drift');
+  stack({ 'eslint.config.mjs': sha256('export default [];\n') });
+  assert.equal(level()?.level, 'pass');
+  stack({ 'eslint.config.mjs': sha256('something else') });
+  assert.equal(level()?.level, 'warn');
+  stack({ 'eslint.config.mjs': sha256('export default [];\n'), 'vitest.config.ts': sha256('x') });
+  assert.match(level()?.message ?? '', /missing vitest\.config\.ts/);
 });

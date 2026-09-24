@@ -101,6 +101,15 @@ function real(p) {
   }
 }
 
+/**
+ * Whether the project layer is committed: HEAD contains `.keel/config.json`. Until the
+ * owner commits it, adoption is still being set up and reviewed.
+ * @param {string} root
+ */
+export function layerCommitted(root) {
+  return run(root, ['cat-file', '-e', `HEAD:${prefix(root)}.keel/config.json`], { allowFail: true }) !== null;
+}
+
 /** @param {string} root */
 export function isRepo(root) {
   return run(root, ['rev-parse', '--is-inside-work-tree'], { allowFail: true })?.trim() === 'true';

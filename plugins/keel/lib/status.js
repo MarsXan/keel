@@ -4,7 +4,7 @@ import { hasToken, lastGreen } from './approvals.js';
 import { branchHash, changeHash } from './artifacts.js';
 import { section, tierRank } from './changefile.js';
 import { approvalQueries, buildContext } from './context.js';
-import { isRepo, stagedDiff } from './git.js';
+import { isRepo, layerCommitted, stagedDiff } from './git.js';
 import { sha256, shortHash } from './hash.js';
 import { taskState } from './tasks.js';
 
@@ -78,6 +78,7 @@ export function statusText(ctx) {
   if (ctx.adoption === 'none') return 'keel: this project has not adopted Keel (run /keel:adopt).';
   const lines = [];
   if (ctx.configErrors.length > 0) lines.push('configuration: INVALID', ...ctx.configErrors.slice(0, 5).map((e) => `  - ${e}`));
+  if (isRepo(ctx.root) && !layerCommitted(ctx.root)) lines.push('project layer: not committed yet — the owner reviews and commits it; guardrail files are protected from that commit on');
   const ch = ctx.change;
   if (!ch) {
     lines.push('change: none active');

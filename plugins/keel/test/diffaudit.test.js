@@ -46,10 +46,16 @@ test('source changed without an approved plan is a finding', () => {
 });
 
 test('a protected file changed without an approved amendment is a finding', () => {
-  const dir = gitRepo({ files: { 'CLAUDE.md': 'a' }, commit: true });
+  const dir = gitRepo({ files: { 'CLAUDE.md': 'a', '.keel/config.json': '{"keel":"0.1"}' }, commit: true });
   writeFileSync(join(dir, 'CLAUDE.md'), 'b');
   assert.match(auditWorkingTree(dir, opts({ isApproved: (w) => w === 'plan' })).findings.join('\n'), /protected[\s\S]*CLAUDE\.md/);
   assert.deepEqual(auditWorkingTree(dir, opts({ isApproved: () => true })).findings, []);
+});
+
+test('until the owner commits the project layer, adoption may write guardrail files', () => {
+  const dir = gitRepo({ files: { 'README.md': 'x' }, commit: true });
+  writeFileSync(join(dir, 'CLAUDE.md'), 'adopted');
+  assert.deepEqual(auditWorkingTree(dir, opts({ isApproved: (w) => w === 'plan' })).findings, []);
 });
 
 test('a changed frozen test is a finding', () => {

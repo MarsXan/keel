@@ -6,7 +6,7 @@
  */
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { changedFiles, headContents, hiddenFiles } from '../git.js';
+import { changedFiles, headContents, hiddenFiles, layerCommitted } from '../git.js';
 import { matchAny } from '../glob.js';
 import { classifier } from '../paths.js';
 import { tierRank } from '../changefile.js';
@@ -67,7 +67,9 @@ export function auditWorkingTree(root, opts) {
     }
   }
   findings.push(...frozenFindings(root, opts.frozenTests ?? {}, { red: Boolean(opts.redStage) }));
-  if (guarded.length > 0 && !amendApproved(opts.change, opts.isApproved)) {
+  // Until the owner commits the project layer, adoption (keel adopt, a stack pack) is still
+  // being set up; the owner's review and commit of it is the trust anchor.
+  if (guarded.length > 0 && !amendApproved(opts.change, opts.isApproved) && layerCommitted(root)) {
     findings.push(`protected files changed without an approved amendment: ${list(guarded)}. Restore them, or run /keel:amend.`);
   }
   if (gated.length > 0) {

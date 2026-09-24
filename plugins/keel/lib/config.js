@@ -53,7 +53,7 @@ const DEFAULTS = {
     heavy: [],
     critical: [],
     protected: [
-      'CLAUDE.md', 'CONSTITUTION.md', 'AGENTS.md', '.claude/**', '.keel/config.json', '.keel/baseline/**',
+      'CLAUDE.md', 'CONSTITUTION.md', 'AGENTS.md', '.claude/**', '.keel/config.json', '.keel/baseline/**', '.keel/stack.json',
       // Checker configurations decide what "green" means.
       '**/vitest.config.*', '**/vitest.workspace.*', '**/jest.config.*', '**/eslint.config.*', '**/.eslintrc*',
       '**/.dependency-cruiser.*', '**/playwright.config.*', '**/.mocharc*', '**/biome.json', '**/biome.jsonc',
