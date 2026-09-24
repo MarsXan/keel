@@ -15,6 +15,25 @@
 - **The amend flow, end to end**, and an audit of the fixture as Keel and the pack adopt it.
 - **The weekly audit guide** and a scheduled workflow template.
 
+### Fixes from the M3 review
+- **Security:** `git config key value --get` and `git remote -v add` passed as reads (git
+  stops parsing options at the first operand); with `core.fsmonitor` set, the next
+  `git status` Keel runs outside the sandbox executed the program. Reads now follow git's
+  parsing, and Keel's own git always runs with `core.fsmonitor=false`.
+- **Guards:** worktrees are recognized by real path, nested inside the project, and from a
+  linked session; `--orphan` is refused and the base branch also anchors the project layer;
+  a recursive delete may not take a protected file with it; read-only roles cannot install
+  through `pnpm -w add` or run `--fix`/`--write` tools.
+- **keel-nestjs:** the CI template fetches Keel outside the workspace (inside it, ESLint
+  and the canary sweep saw Keel's own files) and `adopt` pins `packageManager`;
+  `/keel-nestjs:adopt` asks the owner to run the adopter (the sandbox protects Keel's
+  configuration); `*.spec.ts` tests run; coverage thresholds run in CI; every `tsconfig*.json`
+  is protected; `package.json` files are no longer heavy; interface and infrastructure may not
+  import each other; the domain may not reach timers or the clock through `globalThis` or
+  `node:timers`; nine more canaries (39) and a mutation test proving each architecture and
+  lint canary is caught because of its rule; the sweep touches only `apps/` and `libs/`, a run
+  that plants nothing fails, and canaries no longer inherit `CI`.
+
 ## 0.3.0 — keel-nestjs (unreleased)
 
 ### keel-nestjs, the first stack pack

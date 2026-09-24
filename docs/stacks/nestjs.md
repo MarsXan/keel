@@ -20,17 +20,19 @@ NestJS 12 is ESM-only, so projects are `"type": "module"` with `NodeNext` resolu
 
 ## Install
 
-In a project that has adopted Keel: `/keel-nestjs:adopt` (or `keel-nestjs adopt`). It copies
+In a project that has adopted Keel, run `/keel-nestjs:adopt`: the owner runs `keel-nestjs adopt` in their own terminal (the sandbox keeps agents from writing Keel's configuration). It copies
 `.dependency-cruiser.cjs`, `eslint.config.mjs`, `tsconfig.base.json`, `tsconfig.json`,
 `vitest.config.ts`, `.github/workflows/keel.yml` and `.claude/rules/*.md` without replacing
 existing files; merges sources, heavy paths, protected files, the domain cap and checks into
-`.keel/config.json` (lists only grow, caps only tighten); adds missing `package.json` scripts;
+`.keel/config.json` (lists only grow, caps only tighten, a same-id check gains the pack's stages); adds missing `package.json` scripts and a `packageManager` pin;
 and records what it installed in `.keel/stack.json` for `keel doctor`'s drift check. It prints
 the pinned `pnpm add -D -w …` line for the tools. Once the Keel project layer is committed,
 installing the pack is a guardrail change: it rides on `/keel:amend` with an ADR.
 
 `keel-nestjs canaries [--project dir]` then proves the setup: every configured checker passes
-the project clean, and rejects every planted violation with its rule ID. Canaries plant into
+the project clean, and rejects every planted violation with its rule ID; a run where nothing
+could be planted fails. A mutation test in the pack switches each rule off and requires its
+canary to be missed, so every canary is caught because of its rule. Canaries plant into
 the project's own layout (its first two contexts and first app) and always clean up.
 
 ## Rules and their canaries
@@ -43,12 +45,19 @@ the project's own layout (its first two contexts and first app) and always clean
 | `boundaries-dependencies` | ESLint | `boundaries/dependencies` | `__canary__use-case.ts`, `__canary__layer.ts` |
 | `boundaries-domain-framework` | ESLint | `boundaries/dependencies` | `__canary__framework.ts` |
 | `complexity` | ESLint | `complexity` | `__canary__complex.ts` |
+| `coverage-thresholds` | Vitest coverage | `does not meet "libs/*/src/domain/**" threshold` | `__canary__uncovered.ts` |
+| `domain-globalthis-date` | ESLint | `no-restricted-syntax` | `__canary__global-date.ts` |
+| `domain-max-lines` | ESLint | `max-lines` | `__canary__long.ts` |
 | `domain-no-framework` | dependency-cruiser | `domain-no-framework` | `__canary__framework.ts` |
+| `domain-no-inline-config` | ESLint | `no-restricted-syntax` | `__canary__inline-disable.ts` |
 | `domain-no-other-contexts` | dependency-cruiser | `domain-no-other-contexts` | `__canary__other.ts` |
 | `domain-no-outer-layers` | dependency-cruiser | `domain-no-outer-layers` | `__canary__outer.ts`, `__canary__adapter.ts` |
+| `domain-timers-import` | ESLint | `no-restricted-imports` | `__canary__timers.ts` |
 | `eslint-comments-no-restricted-disable` | ESLint | `@eslint-community/eslint-comments/no-restricted-disable` | `__canary__disable.ts` |
 | `eslint-comments-no-use` | ESLint | `@eslint-community/eslint-comments/no-use` | `__canary__directive.ts` |
 | `eslint-comments-require-description` | ESLint | `@eslint-community/eslint-comments/require-description` | `__canary__bare-disable.ts` |
+| `infrastructure-no-interface` | dependency-cruiser | `infrastructure-no-interface` | `__canary__adapter.ts`, `__canary__route.ts` |
+| `interface-no-infrastructure` | dependency-cruiser | `interface-no-infrastructure` | `__canary__store.ts`, `__canary__controller.ts` |
 | `max-lines` | ESLint | `max-lines` | `__canary__long-file.ts` |
 | `max-lines-per-function` | ESLint | `max-lines-per-function` | `__canary__long-function.ts` |
 | `max-params` | ESLint | `max-params` | `__canary__params.ts` |
@@ -57,6 +66,7 @@ the project's own layout (its first two contexts and first app) and always clean
 | `no-explicit-any` | ESLint | `@typescript-eslint/no-explicit-any` | `__canary__any.ts` |
 | `no-restricted-globals` | ESLint | `no-restricted-globals` | `__canary__timer.ts` |
 | `no-restricted-syntax` | ESLint | `no-restricted-syntax` | `__canary__now.ts` |
+| `no-unlimited-disable` | ESLint | `@eslint-community/eslint-comments/no-unlimited-disable` | `__canary__unlimited.ts` |
 | `not-to-dev-dep` | dependency-cruiser | `not-to-dev-dep` | `__canary__devdep.ts` |
 | `not-to-unresolvable` | dependency-cruiser | `not-to-unresolvable` | `__canary__deep-package.ts` |
 | `ts-implicit-any` | TypeScript | `TS7006` | `__canary__implicit-any.ts` |
@@ -67,6 +77,7 @@ the project's own layout (its first two contexts and first app) and always clean
 | `vitest-no-focused-tests` | ESLint | `vitest/no-focused-tests` | `__canary__focused.test.ts` |
 | `vitest-no-tests` | Vitest | `No test suite found in file` | `__canary__empty.test.ts` |
 | `vitest-require-assertions` | Vitest | `expected any number of assertion, but got none` | `__canary__no-assertions.test.ts` |
+| `vitest-spec-files` | Vitest | `expected 1 to be 2` | `__canary__failing.spec.ts` |
 
 ## Adding or changing a rule
 
