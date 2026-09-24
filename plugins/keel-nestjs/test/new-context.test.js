@@ -6,7 +6,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { runChecker, sweep } from '../lib/canaries.js';
-import { FIXTURE, PACK_ROOT } from './helpers.js';
+import { FIXTURE, PACK_ROOT, withFixture } from './helpers.js';
 
 const TEMPLATES = join(PACK_ROOT, 'skills', 'new-context', 'templates');
 const skip = existsSync(join(FIXTURE, 'node_modules', '.bin', 'tsc')) ? false : 'fixture not installed: run `pnpm install` in fixtures/nestjs-sample';
@@ -19,7 +19,7 @@ test('the package template exports only the public index', () => {
   assert.deepEqual(pkg.dependencies, { '@nestjs/common': '12.1.0', 'reflect-metadata': '0.2.2' });
 });
 
-test('the module, index and module test pass every checker', { skip }, () => {
+test('the module, index and module test pass every checker', { skip }, () => withFixture(() => {
   const vars = { name: '__canary__billing', Name: 'CanaryBilling' };
   const dir = join(FIXTURE, 'apps', 'api', 'src');
   const planted = {
@@ -38,4 +38,4 @@ test('the module, index and module test pass every checker', { skip }, () => {
     for (const file of Object.keys(planted)) rmSync(join(dir, file), { force: true });
     sweep(FIXTURE);
   }
-});
+}));
