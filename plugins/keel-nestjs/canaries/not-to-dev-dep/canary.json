@@ -1,0 +1,1 @@
+{ "checker": "arch", "expect": "not-to-dev-dep" }

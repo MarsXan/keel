@@ -1,0 +1,1 @@
+{ "checker": "arch", "expect": "apps-only-public-api" }

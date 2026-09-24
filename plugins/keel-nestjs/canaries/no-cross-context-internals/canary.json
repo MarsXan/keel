@@ -1,0 +1,1 @@
+{ "checker": "arch", "expect": "no-cross-context-internals" }
