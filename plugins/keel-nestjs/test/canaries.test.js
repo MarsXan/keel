@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { CHECKERS, loadCanaries, runCanary, runChecker, sweep } from '../lib/canaries.js';
-import { FIXTURE, PACK_ROOT } from './helpers.js';
+import { CHECKERS, instantiate, layoutOf, loadCanaries, runCanary, runChecker, sweep } from '../lib/canaries.js';
+import { FIXTURE, PACK_ROOT, runPack } from './helpers.js';
 
 const installed = existsSync(join(FIXTURE, 'node_modules', '.bin', 'tsc'));
 const skip = installed ? false : 'fixture not installed: run `pnpm install` in fixtures/nestjs-sample';
@@ -34,10 +34,24 @@ for (const [checker, { config }] of Object.entries(CHECKERS)) {
   });
 }
 
+test('canaries plant into the project layout', () => {
+  assert.deepEqual(layoutOf(FIXTURE), { context: 'ledger', other: 'wallet', otherPackage: '@sample/wallet', app: 'api' });
+  const one = canaries.find((c) => c.id === 'no-cross-context-internals');
+  assert.ok(one);
+  assert.match(String(instantiate(one, { context: 'a', other: null, otherPackage: null, app: null })), /needs a project with other/);
+});
+
 for (const canary of canaries) {
   test(`canary ${canary.id} is rejected by ${canary.checker} with ${canary.expect}`, { skip }, () => {
     const r = runCanary(FIXTURE, canary);
+    assert.equal(r.skipped, undefined);
     assert.ok(r.caught, `not caught (exit ${r.code}):\n${r.output.slice(0, 3000)}`);
-    for (const f of canary.files) assert.equal(existsSync(join(FIXTURE, f.rel)), false, `${f.rel} was removed`);
+    assert.deepEqual(sweep(FIXTURE), [], 'nothing planted was left behind');
   });
 }
+
+test('keel-nestjs canaries reports the clean checks and every canary', { skip }, async () => {
+  const r = await runPack(['canaries', '--project', FIXTURE]);
+  assert.equal(r.code, 0, r.stdout);
+  assert.match(r.stdout, /✓ arch[\s\S]*✓ lint[\s\S]*✓ types[\s\S]*✓ test[\s\S]*canaries: \d+ caught, 0 missed, 0 skipped[\s\S]*PASS/);
+});

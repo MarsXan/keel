@@ -1,7 +1,8 @@
 // Keel (keel-nestjs) architecture rules — the authority for layers and bounded contexts.
 // Every rule has a canary in the pack (canaries/<rule>/) that proves it still fires.
 // Changes go through /keel:amend.
-const FRAMEWORK = '(^|/)node_modules/(@nestjs|@prisma|prisma|typeorm|mongoose|ioredis|redis|express|fastify|socket\\.io|axios|bullmq|kafkajs|nats)(/|$)';
+// Resolved into node_modules, or left unresolved: either way the name decides.
+const FRAMEWORK = '(^|(^|/)node_modules/)(@nestjs|@prisma|prisma|typeorm|mongoose|ioredis|redis|express|fastify|socket\\.io|axios|bullmq|kafkajs|nats)(/|$)';
 const TESTS = '\\.(test|spec)\\.ts$';
 
 /** @type {import('dependency-cruiser').IConfiguration} */

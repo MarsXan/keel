@@ -6,13 +6,16 @@ export const VERSION = '0.3.0';
 export const USAGE = `usage: keel-nestjs <command> [options]
 
 commands:
+  canaries [--project dir]  every checker passes clean and rejects each planted violation
   --version            print the version`;
 
 /** @typedef {import('../../keel/lib/cli.js').Io} Io */
 /** @typedef {(args: string[], io: Io) => Promise<number> | number} Command */
 
 /** @type {Record<string, () => Promise<Command>>} */
-const COMMANDS = {};
+const COMMANDS = {
+  canaries: () => import('./canaries.js').then((m) => m.canariesCommand),
+};
 
 /** @returns {Io} */
 function processIo() {

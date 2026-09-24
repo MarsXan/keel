@@ -7,7 +7,8 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const MARK = '__canary__';
 
@@ -54,7 +55,59 @@ export function findings(checker, output) {
 /**
  * @typedef {{ id: string, checker: string, expect: string, files: { rel: string, content: string }[] }} Canary
  * @typedef {{ ok: boolean, code: number | null, output: string }} Run
+ * @typedef {{ context: string | null, other: string | null, otherPackage: string | null, app: string | null }} Layout
  */
+
+/** @param {string} dir */
+function subdirs(dir) {
+  try {
+    return readdirSync(dir).filter((n) => statSync(join(dir, n)).isDirectory()).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The names canaries plant into: the project's first two bounded contexts (libs with a
+ * src/domain folder), the second one's package name, and its first app.
+ * @param {string} project
+ * @returns {Layout}
+ */
+export function layoutOf(project) {
+  const contexts = subdirs(join(project, 'libs')).filter((n) => existsSync(join(project, 'libs', n, 'src', 'domain')));
+  const other = contexts[1] ?? null;
+  let otherPackage = null;
+  if (other) {
+    try {
+      otherPackage = JSON.parse(readFileSync(join(project, 'libs', other, 'package.json'), 'utf8')).name ?? null;
+    } catch {
+      otherPackage = null;
+    }
+  }
+  return { context: contexts[0] ?? null, other, otherPackage, app: subdirs(join(project, 'apps'))[0] ?? null };
+}
+
+/**
+ * The canary with {{context}}, {{other}}, {{otherPackage}} and {{app}} filled in, or the
+ * reason it cannot apply to this project's layout.
+ * @param {Canary} canary
+ * @param {Layout} layout
+ * @returns {Canary | string}
+ */
+export function instantiate(canary, layout) {
+  /** @type {string[]} */
+  const missing = [];
+  /** @param {string} s */
+  const fill = (s) =>
+    s.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+      const value = layout[/** @type {keyof Layout} */ (key)];
+      if (!value) missing.push(key);
+      return value ?? '';
+    });
+  const files = canary.files.map((f) => ({ rel: fill(f.rel), content: fill(f.content) }));
+  if (missing.length > 0) return `needs a project with ${[...new Set(missing)].join(', ')} (libs/<context>/src/domain, apps/<app>)`;
+  return { ...canary, files };
+}
 
 /** @param {string} dir @returns {string[]} */
 function walk(dir) {
@@ -126,12 +179,16 @@ export function runChecker(project, checker, files = []) {
 }
 
 /**
- * Plants one canary, runs its checker, and always removes what it planted.
+ * Plants one canary into the project's layout, runs its checker, and always removes what it
+ * planted. A canary the layout cannot hold (one context, no app) is skipped with the reason.
  * @param {string} project
- * @param {Canary} canary
- * @returns {Run & { caught: boolean }}
+ * @param {Canary} template
+ * @param {Layout} [layout]
+ * @returns {Run & { caught: boolean, skipped?: string }}
  */
-export function runCanary(project, canary) {
+export function runCanary(project, template, layout = layoutOf(project)) {
+  const canary = instantiate(template, layout);
+  if (typeof canary === 'string') return { ok: true, code: null, output: '', caught: false, skipped: canary };
   /** @type {string[]} */
   const planted = [];
   /** @type {string[]} */
@@ -166,4 +223,58 @@ function firstMissing(dir, project) {
   let missing = null;
   for (let d = dir; d !== project && d.startsWith(project) && !existsSync(d); d = dirname(d)) missing = d;
   return missing;
+}
+
+/** The pack's own canaries. */
+export const PACK_CANARIES = fileURLToPath(new URL('../canaries', import.meta.url));
+
+/**
+ * `keel-nestjs canaries [--project dir]`: every configured checker passes clean, and every
+ * canary the project's layout can hold is rejected with its rule ID.
+ * @type {import('./cli.js').Command}
+ */
+export function canariesCommand(args, io) {
+  const at = args.indexOf('--project');
+  const project = resolve(io.cwd, at >= 0 && args[at + 1] ? args[at + 1] : '.');
+  const left = sweep(project);
+  if (left.length > 0) io.stdout.write(`removed planted files left by an earlier run: ${left.join(', ')}\n`);
+  let failed = 0;
+  io.stdout.write('clean:\n');
+  for (const [checker, { config }] of Object.entries(CHECKERS)) {
+    if (!existsSync(join(project, config))) {
+      io.stdout.write(`  - ${checker} (no ${config})\n`);
+      continue;
+    }
+    const r = runChecker(project, checker);
+    if (!r.ok) failed++;
+    io.stdout.write(`  ${r.ok ? '✓' : '✗'} ${checker}${r.ok ? '' : `\n${indent(r.output)}`}\n`);
+  }
+  const layout = layoutOf(project);
+  const counts = { caught: 0, missed: 0, skipped: 0 };
+  /** @type {string[]} */
+  const lines = [];
+  for (const canary of loadCanaries(PACK_CANARIES)) {
+    if (!existsSync(join(project, CHECKERS[canary.checker].config))) {
+      counts.skipped++;
+      continue;
+    }
+    const r = runCanary(project, canary, layout);
+    if (r.skipped) {
+      counts.skipped++;
+      lines.push(`  - ${canary.id}: ${r.skipped}`);
+    } else if (r.caught) counts.caught++;
+    else {
+      counts.missed++;
+      lines.push(`  ✗ ${canary.id} (${canary.checker} should report ${canary.expect})\n${indent(r.output)}`);
+    }
+  }
+  io.stdout.write(`canaries: ${counts.caught} caught, ${counts.missed} missed, ${counts.skipped} skipped\n${lines.map((l) => `${l}\n`).join('')}`);
+  const ok = failed === 0 && counts.missed === 0;
+  io.stdout.write(`keel-nestjs canaries: ${ok ? 'PASS' : 'FAIL'}\n`);
+  return ok ? 0 : 1;
+}
+
+/** @param {string} text */
+function indent(text) {
+  return text.trim().split('\n').slice(0, 12).map((l) => `      ${l}`).join('\n');
 }
