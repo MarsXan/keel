@@ -22,7 +22,7 @@ test('the hook script does nothing outside Claude Code and fails closed without 
 test('hooks are installed, executable, and never written over foreign hooks', () => {
   const dir = adopted();
   const r = installGitHooks(dir);
-  assert.deepEqual(r.installed, ['pre-commit', 'pre-merge-commit', 'pre-push']);
+  assert.deepEqual(r.installed, ['pre-commit', 'pre-merge-commit', 'pre-push', 'reference-transaction']);
   assert.ok(statSync(join(dir, '.git/hooks/pre-commit')).mode & 0o111);
   assert.equal(gitHooksInstalled(dir), true);
   const other = adopted();
@@ -90,4 +90,24 @@ test('pre-push: protected branches, deletes and force pushes fail; an approved b
   recordApproval(dir, { change: null, what: 'pr', hash: branchHash(dir, 'main') });
   assert.match((await push(`refs/heads/feat/x ${rewritten} refs/heads/feat/x ${head}`)).stderr, /force push/);
   assert.ok(base);
+});
+
+test('reference-transaction: even with --no-verify, only approved commits land and branches never rewind', () => {
+  const dir = adopted();
+  installGitHooks(dir);
+  const agent = (args) => spawnSync('git', args, { cwd: dir, env: agentEnv(dir), encoding: 'utf8' });
+  writeFiles(dir, { 'src/a.ts': '5\n' });
+  git(dir, ['add', 'src/a.ts']);
+  const sneaky = agent(['commit', '--no-verify', '-qm', 'sneaky']);
+  assert.notEqual(sneaky.status, 0);
+  assert.match(sneaky.stderr, /was not approved/);
+  recordApproval(dir, { change: null, what: 'commit', hash: stagedHash(dir) });
+  assert.equal(agent(['commit', '--no-verify', '-qm', 'approved']).status, 0);
+  assert.match(agent(['commit', '--amend', '--no-verify', '-qm', 'amended']).stderr, /backwards or be rewritten/);
+  assert.match(agent(['reset', '--hard', 'HEAD~1']).stderr, /backwards or be rewritten/);
+  writeFiles(dir, { 'src/a.ts': '6\n' });
+  assert.match(agent(['stash']).stderr, /refs\/stash/);
+  assert.equal(agent(['checkout', '-q', '-b', 'feat/new']).status, 0, 'a new branch at an existing commit is fine');
+  const owner = spawnSync('git', ['commit', '-qam', 'owner'], { cwd: dir, env: { ...process.env, CLAUDECODE: '' }, encoding: 'utf8' });
+  assert.equal(owner.status, 0, owner.stderr);
 });

@@ -7,8 +7,8 @@ import { literalPrefix, matchAny, normalizePath } from './glob.js';
 
 /** Keel's own state: written only by hooks and the keel CLI. */
 export const STATE_GLOBS = ['.keel/state/**'];
-/** Git internals that change what runs on commit/push. */
-export const GIT_INTERNAL_GLOBS = ['.git/hooks/**', '.git/config', '.git/info/**'];
+/** Git's own data: refs, hooks, config and objects change only through git itself. */
+export const GIT_INTERNAL_GLOBS = ['.git/**'];
 
 /**
  * Resolves a path typed in a command or tool call against `base`.

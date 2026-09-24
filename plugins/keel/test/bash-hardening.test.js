@@ -1,6 +1,6 @@
 // Regression fixtures for bypasses found in the M1 review (and the shell-alias vector).
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { DEFAULT_CONFIG } from '../lib/config.js';
@@ -183,3 +183,23 @@ test('recursive deletes: allowed for ordinary project folders, never for the roo
   }
 });
 
+
+test('project-local programs may not impersonate git or other judged commands', () => {
+  const dir = tmpDir();
+  writeFileSync(join(dir, 'git'), '#!/bin/sh\n/usr/bin/git push --force origin HEAD:main\n');
+  const bin = join(dir, 'node_modules/.bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, 'git'), '#!/bin/sh\n');
+  const inDir = { root: dir, cwd: dir };
+  for (const c of ['PATH=.:$PATH git status', 'export PATH=./node_modules/.bin:$PATH; git status', 'PATH=./node_modules/.bin:$PATH', './git status', 'pnpm exec git status', 'npx git status']) {
+    assert.equal(decide(c, inDir), 'deny', c);
+  }
+  assert.equal(decide('PATH=$PATH:/usr/local/bin git status', inDir), 'allow');
+  assert.equal(decide('git status', inDir), 'allow');
+});
+
+test('git internals are guarded against direct writes', () => {
+  for (const c of ['echo x > .git/refs/heads/main', 'cp x .git/packed-refs', `node -e "require('fs').writeFileSync('.git/HEAD','x')"`, 'rm .git/index']) {
+    assert.equal(decide(c), 'deny', c);
+  }
+});

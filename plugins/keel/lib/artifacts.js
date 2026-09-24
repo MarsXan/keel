@@ -1,7 +1,7 @@
 // @ts-check
 /** Hashes of what each kind of owner approval is bound to. */
 import { artifactText } from './changefile.js';
-import { branchDiff, headSha, mergeBase, stagedDiff, worktreeFingerprint } from './git.js';
+import { branchDiff, commitDiff, headSha, mergeBase, stagedDiff, worktreeFingerprint } from './git.js';
 import { sha256 } from './hash.js';
 
 /**
@@ -17,6 +17,17 @@ export function changeHash(parsed, what) {
 /** Hash of exactly what is staged: a `commit` approval is bound to it. @param {string} root */
 export function stagedHash(root) {
   return sha256(stagedDiff(root));
+}
+
+/**
+ * Hash of one commit's diff against its parent (or the empty tree for a root commit). It is
+ * byte-for-byte the staged diff the owner approved before the commit was made.
+ * @param {string} root
+ * @param {string | null} parent
+ * @param {string} commit
+ */
+export function commitHash(root, parent, commit) {
+  return sha256(commitDiff(root, parent, commit));
 }
 
 /**

@@ -146,3 +146,13 @@ export function lastGreen(root) {
   }
   return null;
 }
+
+/**
+ * Every hash ever approved for a kind, e.g. all approved commit diffs.
+ * @param {string} root
+ * @param {Approvable} what
+ * @returns {Set<string>}
+ */
+export function approvedHashes(root, what) {
+  return new Set(records(root).filter((r) => r.type === 'approve' && r.what === what).map((r) => /** @type {ApprovalRecord} */ (r).hash));
+}

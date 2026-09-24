@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 // Isolate every git call made by the code under test from the developer's own git config.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
 process.env.GIT_CONFIG_NOSYSTEM = '1';
+// Tests decide for themselves whether they run "inside Claude Code".
+delete process.env.CLAUDECODE;
 
 export const BIN = fileURLToPath(new URL('../bin/keel', import.meta.url));
 

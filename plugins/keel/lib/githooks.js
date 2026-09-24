@@ -7,12 +7,12 @@
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { latestApproval } from './approvals.js';
-import { branchHash, stagedHash } from './artifacts.js';
+import { approvedHashes, latestApproval } from './approvals.js';
+import { branchHash, commitHash, stagedHash } from './artifacts.js';
 import { approvalQueries, buildContext } from './context.js';
 import { headSha, run } from './git.js';
 
-export const GIT_HOOKS = ['pre-commit', 'pre-merge-commit', 'pre-push'];
+export const GIT_HOOKS = ['pre-commit', 'pre-merge-commit', 'pre-push', 'reference-transaction'];
 const MARK = '# keel-git-hook';
 const MANAGERS = ['.husky', 'lefthook.yml', '.lefthook.yml', 'lefthook.yaml', '.pre-commit-config.yaml', '.simple-git-hooks.json'];
 
@@ -42,7 +42,7 @@ export function installGitHooks(root) {
   const hooksPath = run(root, ['config', '--get', 'core.hooksPath'], { allowFail: true })?.trim();
   const managers = MANAGERS.filter((f) => existsSync(join(root, f)));
   const instructions = (/** @type {string} */ why) =>
-    `${why}: add \`keel git-hook <hook>\` to your pre-commit, pre-merge-commit and pre-push hooks (it exits 0 outside Claude Code), and add the hook files to paths.protected in .keel/config.json.`;
+    `${why}: add \`keel git-hook <hook> "$@"\` to your pre-commit, pre-merge-commit, pre-push and reference-transaction hooks (it exits 0 outside Claude Code), and add the hook files to paths.protected in .keel/config.json.`;
   if (hooksPath || managers.length > 0) {
     return { installed: [], skipped: [...GIT_HOOKS], instructions: instructions(hooksPath ? `core.hooksPath is set (${hooksPath})` : `a hooks manager is in use (${managers.join(', ')})`) };
   }
@@ -108,6 +108,7 @@ export async function gitHookCommand(args, io) {
     return isApproved('commit', stagedHash(ctx.root)) ? 0 : fail('this commit was not approved by the owner. Ask them to type /keel:approve commit for exactly what is staged.');
   }
   if (name === 'pre-merge-commit') return fail('merges are the owner\'s call.');
+  if (name === 'reference-transaction') return args[1] === 'prepared' ? referenceTransaction(await readLines(io.stdin), ctx.root, fail) : 0;
   if (name !== 'pre-push') return fail('unknown hook');
   const protectedBranches = ctx.config.project.protectedBranches;
   const head = headSha(ctx.root);
@@ -125,6 +126,40 @@ export async function gitHookCommand(args, io) {
   const approval = latestApproval(ctx.root, { what: 'pr' });
   if (!approval || approval.hash !== branchHash(ctx.root, ctx.config.project.baseBranch)) {
     return fail('this branch has no push approval for its current state. Ask the owner to type /keel:approve pr.');
+  }
+  return 0;
+}
+
+const ZERO = /^0+$/;
+const ALLOWED_REFS = /^(HEAD|ORIG_HEAD|FETCH_HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|REBASE_HEAD|AUTO_MERGE|BISECT_\w+|refs\/remotes\/.+|refs\/prefetch\/.+|refs\/worktree\/.+)$/;
+
+/**
+ * Every ref update in an agent session: new commits may land on a branch only when the
+ * owner approved each one's exact diff; branches may not move backwards or sideways
+ * (amend, reset, rebase), and stash, notes and tags are the owner's. Unlike pre-commit,
+ * git runs this hook even with --no-verify.
+ * @param {string[]} lines "<old> <new> <ref>" per update
+ * @param {string} root
+ * @param {(why: string) => number} fail
+ */
+function referenceTransaction(lines, root, fail) {
+  const approved = approvedHashes(root, 'commit');
+  for (const line of lines) {
+    const [oldOid, newOid, ref] = line.split(' ');
+    if (!ref || ALLOWED_REFS.test(ref)) continue;
+    if (!ref.startsWith('refs/heads/')) return fail(`updating ${ref} is the owner's call (stash, notes and tags are not for agents).`);
+    if (ZERO.test(newOid)) continue; // deleting a local branch
+    if (!ZERO.test(oldOid) && oldOid !== newOid && run(root, ['merge-base', '--is-ancestor', oldOid, newOid], { allowFail: true }) === null) {
+      return fail(`${ref.slice(11)} would move backwards or be rewritten (amend, reset, rebase); that is the owner's call.`);
+    }
+    const introduced = (run(root, ['rev-list', '--parents', newOid, '--not', '--all'], { allowFail: true }) ?? '').split('\n').filter(Boolean);
+    for (const entry of introduced.reverse()) {
+      const [commit, ...parents] = entry.split(' ');
+      if (parents.length > 1) return fail('merge commits are the owner\'s call.');
+      if (!approved.has(commitHash(root, parents[0] ?? null, commit))) {
+        return fail(`commit ${commit.slice(0, 12)} was not approved by the owner (its diff does not match any /keel:approve commit). Stage the change and ask the owner to approve it.`);
+      }
+    }
   }
   return 0;
 }

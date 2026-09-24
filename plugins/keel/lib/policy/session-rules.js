@@ -44,6 +44,7 @@ export function declareRule(cmd, name) {
   for (const a of cmd.argv.slice(1)) {
     const eq = a.indexOf('=');
     const key = eq > 0 ? a.slice(0, eq) : a;
+    if (key === 'PATH' && eq > 0) continue; // judged by the PATH shadow check in the bash policy
     const problem = key === 'SKIP' ? 'SKIP disables pre-commit hooks.' : envProblem(key, eq > 0 ? a.slice(eq + 1) : '');
     if (problem) return deny(`${name} ${key}: ${problem}`);
   }

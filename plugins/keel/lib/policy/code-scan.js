@@ -40,12 +40,13 @@ export const DANGER = [
   /\b(HUSKY|LEFTHOOK)\s*=\s*0\b/,
   /\bCLAUDECODE\b/,
   /keel:approve/i,
-  /\bkeel\b[^\n;&|]*\bguard\b/,
+  /\bkeel\b[^\n;&|]*\b(guard|git-hook)\b/,
+  /\.git\/(refs|packed-refs|hooks|config|index\b|HEAD\b|objects|info)/,
 ];
 
 /** Protected path fragments and secret-looking paths that must not appear in inline code. @param {CommandContext} ctx */
 function codeNeedles(ctx) {
-  const needles = new Set(['.keel/state', 'approvals.jsonl', '.git/hooks', '.git/config']);
+  const needles = new Set(['.keel/state', 'approvals.jsonl', '.git/']);
   for (const g of ctx.config.paths.protected) {
     const lit = literalPrefix(g);
     if (lit.length >= 4) needles.add(lit);

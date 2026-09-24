@@ -4,7 +4,8 @@
  * each one. Deny beats ask beats allow. Anything Keel cannot inspect — unparseable input,
  * names or subcommands computed at run time, inspection that runs out of budget — is denied.
  */
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { classifier, resolvePath } from '../paths.js';
 import { parseCommands, ShellParseError } from '../shell.js';
 import { emptyShell } from '../shell-snapshot.js';
@@ -48,6 +49,10 @@ const MAX_COMMANDS = 4000;
 const MAX_MS = 4000;
 const REMOVERS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'srm', 'trash']);
 const OUTPUT_REDIRECTS = new Set(['>', '>>', '>|', '&>', '&>>', '<>']);
+/** Commands a project-local file of the same name could impersonate. */
+const SHADOWABLE = ['git', 'gh', 'hub', 'claude', 'keel', 'sh', 'bash', 'zsh', 'env', 'rm', 'node', 'npx', 'pnpm', 'npm', 'yarn', 'sudo', 'ssh', 'curl'];
+const RUNNERS = new Set(['pnpm', 'npx', 'npm', 'yarn', 'bunx', 'bun', 'pnpx']);
+const TEMP = ['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'];
 
 /** @param {string} abs */
 function listDirectory(abs) {
@@ -121,7 +126,7 @@ function quote(s) {
  */
 function evaluateCommand(cmd, ctx) {
   for (const [k, v] of Object.entries(cmd.env)) {
-    const problem = envProblem(k, v);
+    const problem = envProblem(k, v) ?? (k === 'PATH' ? shadowProblem(v.split(':'), ctx) : null);
     if (problem) return deny(problem);
   }
   const unset = cmd.unset.find((k) => envProblem(k, 'x'));
@@ -141,6 +146,11 @@ function evaluateCommand(cmd, ctx) {
     ? { ...cmd, argv: ['git', ...(dashed ? [dashed[1]] : []), ...cmd.argv.slice(1)], dynamic: [false, ...(dashed ? [false] : []), ...cmd.dynamic.slice(1)] }
     : { ...cmd, argv: [argv0, ...cmd.argv.slice(1)] };
   const name = commandName(c.argv[0]);
+  const exported = ['export', 'declare', 'typeset', 'readonly', 'local'].includes(name)
+    ? c.argv.slice(1).find((a) => a.startsWith('PATH=') && shadowProblem(a.slice(5).split(':'), ctx))
+    : undefined;
+  const shadow = exported ? shadowProblem(exported.slice(5).split(':'), ctx) : shadowOf(c, argv0, name, ctx);
+  if (shadow) return deny(shadow);
   return combine([
     declareRule(c, name),
     definitionRule(c, name),
@@ -160,6 +170,49 @@ function evaluateCommand(cmd, ctx) {
     packageScriptRule(c, name, ctx, nested),
     outwardRule(c, name),
   ]);
+}
+
+/** @param {string} abs */
+function writable(abs, /** @type {CommandContext} */ ctx) {
+  return ctx.classify.rel(abs) !== null || TEMP.some((p) => `${abs}/`.startsWith(p));
+}
+
+/**
+ * Why a PATH would let a project-local file impersonate a system command, or null.
+ * @param {string[]} entries PATH entries (entries that expand the existing $PATH are skipped)
+ * @param {CommandContext} ctx
+ */
+function shadowProblem(entries, ctx) {
+  for (const entry of entries) {
+    if (!entry || entry.includes('$')) continue;
+    const dir = resolvePath(ctx.cwd, entry, ctx.home);
+    if (!writable(dir, ctx)) continue;
+    const hit = SHADOWABLE.find((n) => existsSync(join(dir, n)));
+    if (hit) return `${join(entry, hit)} would run instead of the real ${hit}; project-local copies of system commands are not allowed on PATH.`;
+  }
+  return null;
+}
+
+/**
+ * A command whose name Keel judges (git, rm, …) but whose program is a project-local file.
+ * @param {SimpleCommand} cmd
+ * @param {string} argv0
+ * @param {string} name
+ * @param {CommandContext} ctx
+ */
+function shadowOf(cmd, argv0, name, ctx) {
+  const baseName = name.startsWith('git-') ? 'git' : name;
+  if (!SHADOWABLE.includes(baseName)) return null;
+  if (argv0.includes('/') && writable(resolvePath(ctx.cwd, argv0, ctx.home), ctx)) {
+    return `${argv0} is a project-local file named like ${baseName}; Keel judges commands by name, so run the real ${baseName} instead.`;
+  }
+  if (!RUNNERS.has(cmd.via ?? '')) return null;
+  const dirs = [];
+  for (let dir = ctx.cwd; ctx.classify.rel(dir) !== null; dir = join(dir, '..')) {
+    dirs.push(join(dir, 'node_modules/.bin'));
+    if (dir === ctx.root) break;
+  }
+  return shadowProblem(dirs, ctx);
 }
 
 /**
