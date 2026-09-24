@@ -26,7 +26,8 @@ test('adoption writes a project layer that passes doctor', () => {
   assert.equal(settings.sandbox.enabled, true);
   const levels = Object.fromEntries(runDoctor(dir, { quick: true, home: tmpDir() }).results.map((x) => [x.id, x.level]));
   for (const [id, level] of Object.entries(levels)) {
-    if (id !== 'hooks.output-rewriting') assert.equal(level, 'pass', `${id}: ${level}`);
+    if (id === 'sandbox.tested') assert.equal(level, 'warn', 'the owner runs keel sandbox-test next');
+    else if (id !== 'hooks.output-rewriting') assert.equal(level, 'pass', `${id}: ${level}`);
   }
 });
 

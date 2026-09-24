@@ -30,10 +30,9 @@
   "checks": [
     {
       "id": "typecheck",
-      "run": "pnpm -s typecheck",
+      "run": "pnpm -s exec tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile node_modules/.cache/keel/tsc.tsbuildinfo",
       "stages": [
-        "stop",
-        "ci"
+        "stop"
       ]
     },
     {
@@ -48,6 +47,35 @@
       ]
     },
     {
+      "id": "arch",
+      "run": "pnpm -s exec depcruise --config .dependency-cruiser.cjs {files}",
+      "stages": [
+        "stop"
+      ],
+      "files": [
+        "apps/**/*.ts",
+        "libs/**/*.ts"
+      ]
+    },
+    {
+      "id": "test",
+      "run": "pnpm -s exec vitest related --run --passWithNoTests {files}",
+      "stages": [
+        "stop"
+      ],
+      "files": [
+        "apps/**/*.ts",
+        "libs/**/*.ts"
+      ]
+    },
+    {
+      "id": "typecheck-all",
+      "run": "pnpm -s typecheck",
+      "stages": [
+        "ci"
+      ]
+    },
+    {
       "id": "lint-all",
       "run": "pnpm -s lint",
       "stages": [
@@ -55,18 +83,16 @@
       ]
     },
     {
-      "id": "arch",
+      "id": "arch-all",
       "run": "pnpm -s arch",
       "stages": [
-        "stop",
         "ci"
       ]
     },
     {
-      "id": "test",
+      "id": "test-all",
       "run": "pnpm -s test",
       "stages": [
-        "stop",
         "ci"
       ]
     },
@@ -76,6 +102,27 @@
       "stages": [
         "ci"
       ]
+    }
+  ],
+  "sandboxProbes": [
+    {
+      "id": "pnpm",
+      "run": "pnpm store add is-number@7.0.0",
+      "why": "installing packages",
+      "fix": "pnpm must keep its store inside the project (storeDir: .pnpm-store in pnpm-workspace.yaml, which keel-nestjs adopt sets) and the registry host must be in sandbox.network.allowedDomains"
+    },
+    {
+      "id": "docker",
+      "run": "docker version",
+      "requires": "docker version",
+      "whenFiles": [
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+        "compose.yaml"
+      ],
+      "why": "databases the project runs in containers",
+      "fix": "docker cannot run inside the sandbox: start the databases from your terminal (docker compose up -d), or add \"docker *\" to sandbox.excludedCommands so docker runs outside it"
     }
   ]
 }

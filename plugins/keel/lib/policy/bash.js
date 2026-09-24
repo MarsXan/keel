@@ -33,6 +33,7 @@ import { removeRule } from './remove-rules.js';
  * @property {(what: string, hash: string) => boolean} isApproved
  * @property {(what: string, action: string) => boolean} hasToken
  * @property {() => string} stagedDiffHash
+ * @property {() => string | null} [planCover] why the approved plan does not cover committing what is staged; null once it does and the cover is recorded
  * @property {() => string | null} branch
  * @property {() => string | null} [pushDestination] where a bare `git push` would go
  * @property {(name: string) => string | null} gitAlias

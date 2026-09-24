@@ -63,7 +63,9 @@ claude plugin install keel@keel
 | `.gitignore` | `.keel/state/` stays local |
 | `.git/hooks/*` | pre-commit, pre-merge-commit, pre-push and reference-transaction re-check approvals inside Claude Code (they do nothing in your own terminal) |
 
-Run `keel doctor`, restart Claude Code, review the files and commit them yourself.
+Run `keel doctor`, then `keel sandbox-test` in your own terminal (it proves the toolchain
+works inside the sandbox before the first task), restart Claude Code, review the files and
+commit them yourself.
 
 ## The workflow
 
@@ -75,10 +77,10 @@ by typing `/keel:approve …` in their own prompt.
 | `/keel:start <issue or task>` | issue, tier, branch, change file, `keel use` | spec (T2) or plan (T1) |
 | `/keel:spec` | intent, non-goals, testable `REQ-n` requirements, lint | `/keel:approve spec` |
 | `/keel:plan` | explorer and planner; design by layer; tasks with files and done-when; lint | `/keel:approve plan` |
-| `/keel:build` | per task: `keel task T-n red` → test-writer → RED confirmed → `green` freezes the tests → implementer → checks | every task done |
+| `/keel:build` | per task: `keel task T-n red` → test-writer → RED confirmed → `green` freezes the tests → implementer → checks → commit, covered by the approved plan | every task committed |
 | `/keel:verify` | `keel check --stage ci` and the verifier's REQ → test → code map | Verification written |
-| `/keel:review` | spec, standards and risk reviewers; each finding triaged; at most three rounds | a clean review |
-| `/keel:ship` | doc deltas, `/keel:approve commit`, the commit, `/keel:approve pr`, one push and one pull request | the owner merges |
+| `/keel:review` | once per pull request, over the branch: spec, standards and risk reviewers; each finding triaged; at most three rounds | a clean review |
+| `/keel:ship` | doc deltas and their commit (covered by the plan, or `/keel:approve commit` outside it), `/keel:approve pr`, one push and one pull request | the owner merges |
 | `/keel:spike <question>` | a throwaway probe on a spike branch | findings |
 | `/keel:amend <what and why>` | an Amendment section and an ADR for a guardrail change | `/keel:approve amend` |
 | `/keel:lesson <what went wrong>` | the cheapest check that would have caught it, recorded in `docs/lessons/` | the change that adds it |
@@ -146,8 +148,9 @@ workflow. Install it with `claude plugin install keel-nestjs@keel`, then run
 | `keel check [--stage stop\|ci]` | the diff audit and the configured checks on changed files |
 | `keel diff-audit` | the diff audit alone |
 | `keel ci [--base ref]` | the server-side gate for a branch |
-| `keel audit [--metrics] [--json] [--strict]` | the weekly drift report: stale knowledge, harness, hotspots, debt, rework and flow |
-| `keel doctor [--quick]` | audit the harness: config, constitution, settings, permissions, git hooks |
+| `keel audit [--metrics] [--json] [--strict]` | the weekly drift report: stale knowledge, harness, hotspots, debt, rework, flow and Keel's own cost |
+| `keel doctor [--quick]` | audit the harness: config, constitution, settings, permissions, git hooks, the sandbox test |
+| `keel sandbox-test [--dry-run]` | try the toolchain inside the sandbox through a headless Claude Code session (your own terminal only) |
 | `keel adopt [--name --base --protected --github --source --packages]` | write the project layer and install the git hooks |
 | `keel git-hook <hook>` | git hook entry point (installed by adopt) |
 
@@ -170,9 +173,12 @@ them and the latest results are in [`docs/evals/README.md`](docs/evals/README.md
   task stages and the test freeze, git hooks, ledger handoffs, `keel ci`, evals.
 - **0.3 keel-nestjs** — configs proven by canaries, path-scoped rules and scaffolding for
   clean-architecture NestJS pnpm monorepos.
-- **0.4 learning loop** — this release: `keel audit` and `/keel:audit`, lessons that become
-  checks, the amend flow proven end to end, the weekly audit guide
+- **0.4 learning loop** — `keel audit` and `/keel:audit`, lessons that become checks, the
+  amend flow proven end to end, the weekly audit guide
   ([`docs/guides/weekly-audit.md`](docs/guides/weekly-audit.md)).
+- **0.5 speed** — this release: commits covered by the approved plan, end-of-turn checks on
+  the change only, review once per pull request, `keel sandbox-test`, and Keel's own cost in
+  `keel audit --metrics` ([`docs/specs/2026-09-24-keel-speed.md`](docs/specs/2026-09-24-keel-speed.md)).
 
 The design lives in [`docs/specs/2026-09-24-keel-design.md`](docs/specs/2026-09-24-keel-design.md).
 

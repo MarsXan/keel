@@ -1,6 +1,6 @@
 # Keel speed: faster gates, same guarantees
 
-Date: 2026-09-24 · Status: proposed · Decisions: the owner, 2026-09-24
+Date: 2026-09-24 · Status: built in 0.5.0 · Decisions: the owner, 2026-09-24
 
 ## Why
 
@@ -16,7 +16,9 @@ together. A guardrail that slows everyday work is a Keel bug. Measured on 2026-0
   repository.
 - **Owner stops:** T1 needs plan, commit and pull-request approvals; T2 adds the spec. The one
   commit waits until the whole change is reviewed.
-- **`/keel:build` is documented but missing**, so the pipeline has no step after plan approval.
+
+(A first draft of this spec said `/keel:build` was missing. It is not: an output-rewriting
+shell hook had hidden the `build/` directory from `ls`. `/keel:build` gains a commit step.)
 
 ## Decisions
 
@@ -84,12 +86,10 @@ fast. Amend, `-a`, `--no-verify`, merges and rewrites stay refused.
   request, as today. The sandbox cannot use SSH keys, so with an SSH remote the owner runs the
   push; the skill prints the exact command.
 
-### 4. `/keel:build`
+### 4. `/keel:build` commits each task
 
-For each task in plan order: `keel task T-n red` → the test-writer's failing tests, shown
-failing for the right reason → `keel task T-n green` (freezes the tests) → the implementer
-until the task's done-when command passes → optional refactor → `keel task T-n done` →
-`git add <the task's files>` and `git commit`. Next: `/keel:verify`.
+After `keel task T-n done`, the build stages the task's files and the change file and runs
+`git commit`; the plan covers it (section 2). Next, as before: `/keel:verify`.
 
 ### 5. Sandbox tool test
 

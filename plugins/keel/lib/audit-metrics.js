@@ -6,9 +6,11 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { trustedRecords } from './approvals.js';
 import { parseChange, section } from './changefile.js';
 import { readText } from './context.js';
 import { run } from './git.js';
+import { readChecks } from './metrics.js';
 import { classifier } from './paths.js';
 import { lineCap, lineCount } from './policy/content.js';
 import { statePaths } from './state.js';
@@ -156,4 +158,85 @@ export function ledgerEvents(root, { days = 30, now = new Date() } = {}) {
     }
   }
   return { escalations, unverified, available: true };
+}
+
+/** Median of a list of numbers; null when empty. @param {number[]} values */
+function median(values) {
+  if (values.length === 0) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** Nearest-rank percentile; null when empty. @param {number[]} values @param {number} p */
+function percentile(values, p) {
+  if (values.length === 0) return null;
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.max(0, Math.ceil(p * s.length) - 1))];
+}
+
+/**
+ * When each change started: its earliest entry in the hook-only store or its ledger.
+ * @param {string} root
+ * @param {any[]} trusted
+ * @returns {Map<string, number>}
+ */
+function changeStarts(root, trusted) {
+  /** @type {Map<string, number>} */
+  const starts = new Map();
+  const seen = (/** @type {string} */ change, /** @type {number} */ t) => {
+    if (!Number.isNaN(t) && t < (starts.get(change) ?? Infinity)) starts.set(change, t);
+  };
+  for (const r of trusted) if (typeof r.change === 'string' && typeof r.ts === 'string') seen(r.change, Date.parse(r.ts));
+  const dir = statePaths(root).ledgerDir;
+  if (!existsSync(dir)) return starts;
+  for (const name of readdirSync(dir).filter((n) => n.endsWith('.md') && n !== '_session.md')) {
+    const first = /^- (\S+) /m.exec(readText(join(dir, name)) ?? '');
+    if (first) seen(name.slice(0, -3), Date.parse(first[1]));
+  }
+  return starts;
+}
+
+/**
+ * What Keel's gates cost in the last `days`, from this machine's records: time spent on
+ * checks per verified turn and the slowest check, commits covered by approved plans against
+ * commits approved one by one, owner approvals per change, and the time from a change's
+ * start to its pull-request approval.
+ * @param {string} root
+ * @param {{ days?: number, now?: Date }} [opts]
+ */
+export function keelCost(root, { days = 30, now = new Date() } = {}) {
+  const until = now.getTime();
+  const since = until - days * 86_400_000;
+  const recent = (/** @type {{ ts?: unknown }} */ r) => typeof r.ts === 'string' && Date.parse(r.ts) >= since && Date.parse(r.ts) <= until;
+  const turns = readChecks(root).filter((r) => r.kind === 'stop' && recent(r));
+  /** @type {Map<string, number[]>} */
+  const perCheck = new Map();
+  for (const t of turns) for (const c of t.checks) if (!c.skipped) perCheck.set(c.id, [...(perCheck.get(c.id) ?? []), c.ms]);
+  const slowest = [...perCheck].map(([id, ms]) => ({ id, medianMs: /** @type {number} */ (median(ms)) })).sort((a, b) => b.medianMs - a.medianMs)[0] ?? null;
+
+  const trusted = trustedRecords(root);
+  const approvals = trusted.filter((r) => r.type === 'approve' && recent(r));
+  /** @type {Record<string, number>} */
+  const byKind = {};
+  /** @type {Map<string, number>} */
+  const perChange = new Map();
+  /** @type {Map<string, number>} */
+  const prAt = new Map();
+  for (const a of approvals) {
+    byKind[a.what] = (byKind[a.what] ?? 0) + 1;
+    if (typeof a.change !== 'string') continue;
+    perChange.set(a.change, (perChange.get(a.change) ?? 0) + 1);
+    if (a.what === 'pr' && !prAt.has(a.change)) prAt.set(a.change, Date.parse(a.ts));
+  }
+  const starts = changeStarts(root, trusted);
+  const hours = [...prAt].filter(([change]) => starts.has(change)).map(([change, t]) => (t - /** @type {number} */ (starts.get(change))) / 3_600_000);
+  return {
+    turns: turns.length,
+    turnMs: { median: median(turns.map((t) => t.ms)), p90: percentile(turns.map((t) => t.ms), 0.9) },
+    slowest,
+    commits: { covered: trusted.filter((r) => r.type === 'cover' && recent(r)).length, approved: byKind.commit ?? 0 },
+    approvals: { total: approvals.length, byKind, perChangeMedian: median([...perChange.values()]) },
+    startToPr: { changes: hours.length, medianHours: median(hours) },
+  };
 }

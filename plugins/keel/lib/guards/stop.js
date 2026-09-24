@@ -10,6 +10,7 @@ import { approvalQueries } from '../context.js';
 import { runChecks } from '../checks.js';
 import { isRepo, worktreeFingerprint } from '../git.js';
 import { block } from '../io.js';
+import { recordChecks } from '../metrics.js';
 import { auditWorkingTree } from '../policy/diffaudit.js';
 import { evaluateStop } from '../policy/stop.js';
 import { appendLedger, updateCurrent } from '../state.js';
@@ -40,6 +41,7 @@ export function stopGuard(input, ctx) {
     auditOnly: role === 'keel:test-writer',
   });
   const who = role || 'main session';
+  recordChecks(ctx.root, { kind: 'stop', change: changeId, results: d.results ?? [] });
   if (d.escalation) appendLedger(ctx.root, changeId, `ESCALATE from ${who}: ${d.escalation}`);
   if (d.decision === 'block') {
     const blocks = (Number(ctx.current.stopBlocks) || 0) + 1;

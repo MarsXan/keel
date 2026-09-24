@@ -36,6 +36,14 @@ the workspace root from any package folder. Its metadata cache stays global: the
 cannot write it, and pnpm installs without it. A project that already set `storeDir` keeps
 it; the adopter notes one outside the project, where sandboxed installs fail.
 
+The checks it merges cover the change at the end of a turn — `typecheck` (incremental), and
+`lint`, `arch` (dependency-cruiser) and `test` (`vitest related`) on the changed files — and
+everything in CI and at `/keel:verify`: `typecheck-all`, `lint-all`, `arch-all`, `test-all`
+and `coverage`. A pack test plants a canary and runs only the narrowed command on its files,
+so each end-of-turn check is proven to still catch its rules. The pack also gives
+`keel sandbox-test` two probes: `pnpm store add` (the registry and the project store) and
+`docker version` (only when a compose file exists).
+
 `keel-nestjs canaries [--project dir]` then proves the setup: every configured checker passes
 the project clean, and rejects every planted violation with its rule ID; a run where nothing
 could be planted fails. A mutation test in the pack switches each rule off and requires its

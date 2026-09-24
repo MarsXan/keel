@@ -40,6 +40,12 @@ const BANNED_PATTERNS = [
 ];
 
 /** @typedef {{ id: string, run: string, stages: string[], files?: string[], timeoutSec?: number }} Check */
+/**
+ * A command `keel sandbox-test` tries inside the sandbox. It applies when every `whenFiles`
+ * path that is listed has at least one match on disk and `requires` succeeds outside the
+ * sandbox; a failing `note` probe informs instead of failing the test.
+ * @typedef {{ id: string, run: string, why: string, fix: string, requires?: string, whenFiles?: string[], note?: boolean }} Probe
+ */
 
 const DEFAULTS = {
   keel: '0.1',
@@ -69,6 +75,7 @@ const DEFAULTS = {
   packages: [],
   caps: { fileLines: 300, fileLinesByPath: {}, testFileLines: 600, prLines: 400, claudeMdLines: 120, ruleFileLines: 60 },
   checks: /** @type {Check[]} */ ([]),
+  sandboxProbes: /** @type {Probe[]} */ ([]),
   tiers: { t1MaxFiles: 8 },
   models: {},
   bannedPatterns: BANNED_PATTERNS,
@@ -94,6 +101,7 @@ const SHAPE = {
     claudeMdLines: 'count', ruleFileLines: 'count',
   },
   checks: 'checks',
+  sandboxProbes: 'probes',
   tiers: { t1MaxFiles: 'count' },
   models: 'stringMap',
   bannedPatterns: 'regexes',
@@ -191,7 +199,40 @@ const LEAVES = {
     v.forEach((check, i) => validateCheck(check, `${path}[${i}]`, seen, errors));
     return null;
   },
+  probes: (v, path, errors) => {
+    if (!Array.isArray(v)) return 'expected an array of probes';
+    const seen = new Set();
+    v.forEach((probe, i) => validateProbe(probe, `${path}[${i}]`, seen, errors));
+    return null;
+  },
 };
+
+const PROBE_KEYS = ['id', 'run', 'why', 'fix', 'requires', 'whenFiles', 'note'];
+
+/**
+ * @param {unknown} probe
+ * @param {string} path
+ * @param {Set<string>} seen
+ * @param {string[]} errors
+ */
+function validateProbe(probe, path, seen, errors) {
+  if (!isObject(probe)) {
+    errors.push(`${path}: expected an object`);
+    return;
+  }
+  for (const key of Object.keys(probe)) if (!PROBE_KEYS.includes(key)) errors.push(`${path}.${key}: unknown key`);
+  const { id, run, why, fix, requires, whenFiles, note } = /** @type {Record<string, unknown>} */ (probe);
+  if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(id)) errors.push(`${path}.id: expected a lowercase id like "pnpm"`);
+  else if (seen.has(id)) errors.push(`${path}.id: duplicate id "${id}"`);
+  else seen.add(id);
+  for (const [key, value] of Object.entries({ run, why, fix })) {
+    if (typeof value !== 'string' || !value.trim()) errors.push(`${path}.${key}: expected a non-empty string`);
+  }
+  if (typeof run === 'string' && /[\r\n]/.test(run)) errors.push(`${path}.run: expected a single line`);
+  if (requires !== undefined && (typeof requires !== 'string' || !requires.trim())) errors.push(`${path}.requires: expected a command`);
+  if (whenFiles !== undefined && !isStrings(whenFiles)) errors.push(`${path}.whenFiles: expected an array of paths`);
+  if (note !== undefined && typeof note !== 'boolean') errors.push(`${path}.note: expected true or false`);
+}
 
 const CHECK_KEYS = ['id', 'run', 'stages', 'files', 'timeoutSec'];
 

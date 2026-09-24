@@ -2,15 +2,18 @@
 /**
  * Git hooks: the second layer for commits and pushes. However an agent reaches git — shell
  * aliases, scripts, commands assembled at run time — git itself runs these hooks. Inside a
- * Claude Code session they re-check the owner's approvals; in the owner's own terminal
- * (no CLAUDECODE) they do nothing.
+ * Claude Code session they re-check the owner's approvals and the covers of approved plans
+ * (read-only: only Claude Code hooks write them); in the owner's own terminal (no CLAUDECODE)
+ * they do nothing.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { approvedHashes, latestApproval } from './approvals.js';
 import { branchHash, commitHash, stagedHash } from './artifacts.js';
 import { approvalQueries, buildContext } from './context.js';
-import { headSha, run } from './git.js';
+import { coveredCommits, isCovered } from './cover.js';
+import { headSha, prefix, run } from './git.js';
+import { EMPTY_TREE } from './git-history.js';
 
 export const GIT_HOOKS = ['pre-commit', 'pre-merge-commit', 'pre-push', 'reference-transaction'];
 const MARK = '# keel-git-hook';
@@ -82,6 +85,19 @@ export function gitHooksInstalled(root) {
   });
 }
 
+/**
+ * Paths a diff touches outside the project folder ([] when the project is the whole
+ * repository). Approval and cover hashes are of the project's own diff, so anything outside
+ * it is refused here or it would ride along unseen.
+ * @param {string} root
+ * @param {string[]} range `--cached`, or two commits
+ */
+function outsideProject(root, range) {
+  const pre = prefix(root);
+  if (!pre) return [];
+  return (run(root, ['diff', '--name-only', '--no-renames', '-z', ...range], { allowFail: true }) ?? '').split('\0').filter((p) => p && !p.startsWith(pre));
+}
+
 /** @param {NodeJS.ReadableStream & { isTTY?: boolean }} stream */
 function readLines(stream) {
   if (stream.isTTY) return Promise.resolve([]);
@@ -104,8 +120,12 @@ export async function gitHookCommand(args, io) {
     return 1;
   };
   if (name === 'pre-commit') {
+    const outside = outsideProject(ctx.root, ['--cached']);
+    if (outside.length > 0) return fail(`staged files outside the Keel project: ${outside.slice(0, 8).join(', ')}. The owner commits those.`);
     const { isApproved } = approvalQueries(ctx);
-    return isApproved('commit', stagedHash(ctx.root)) ? 0 : fail('this commit was not approved by the owner. Ask them to type /keel:approve commit for exactly what is staged.');
+    const hash = stagedHash(ctx.root);
+    if (isApproved('commit', hash) || isCovered(ctx.root, hash, headSha(ctx.root))) return 0;
+    return fail('this commit was not approved by the owner, and no approved plan covers it. Commit through the Bash tool so Keel can check the plan, or ask the owner to type /keel:approve commit for exactly what is staged.');
   }
   if (name === 'pre-merge-commit') return fail('merges are the owner\'s call.');
   if (name === 'reference-transaction') return args[1] === 'prepared' ? referenceTransaction(await readLines(io.stdin), ctx.root, fail) : 0;
@@ -135,15 +155,17 @@ const ALLOWED_REFS = /^(HEAD|ORIG_HEAD|FETCH_HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|RE
 
 /**
  * Every ref update in an agent session: new commits may land on a branch only when the
- * owner approved each one's exact diff; branches may not move backwards or sideways
- * (amend, reset, rebase), and stash, notes and tags are the owner's. Unlike pre-commit,
- * git runs this hook even with --no-verify.
+ * owner approved each one's exact diff, or an approved plan's cover names that diff on that
+ * parent; branches may not move backwards or sideways (amend, reset, rebase), and stash,
+ * notes and tags are the owner's. Unlike pre-commit, git runs this hook even with
+ * --no-verify.
  * @param {string[]} lines "<old> <new> <ref>" per update
  * @param {string} root
  * @param {(why: string) => number} fail
  */
 function referenceTransaction(lines, root, fail) {
   const approved = approvedHashes(root, 'commit');
+  const covered = coveredCommits(root);
   for (const line of lines) {
     const [oldOid, newOid, ref] = line.split(' ');
     if (!ref || ALLOWED_REFS.test(ref)) continue;
@@ -156,8 +178,11 @@ function referenceTransaction(lines, root, fail) {
     for (const entry of introduced.reverse()) {
       const [commit, ...parents] = entry.split(' ');
       if (parents.length > 1) return fail('merge commits are the owner\'s call.');
-      if (!approved.has(commitHash(root, parents[0] ?? null, commit))) {
-        return fail(`commit ${commit.slice(0, 12)} was not approved by the owner (its diff does not match any /keel:approve commit). Stage the change and ask the owner to approve it.`);
+      const outside = outsideProject(root, [parents[0] ?? EMPTY_TREE, commit]);
+      if (outside.length > 0) return fail(`commit ${commit.slice(0, 12)} changes files outside the Keel project: ${outside.slice(0, 8).join(', ')}. The owner commits those.`);
+      const hash = commitHash(root, parents[0] ?? null, commit);
+      if (!approved.has(hash) && !covered.has(`${parents[0] ?? ''} ${hash}`)) {
+        return fail(`commit ${commit.slice(0, 12)} was not approved by the owner (its diff does not match any /keel:approve commit), and no approved plan covers it on its parent. Commit through the Bash tool so Keel can check the plan, or ask the owner to approve it.`);
       }
     }
   }

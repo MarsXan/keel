@@ -88,15 +88,17 @@ test('the full approval flow: plan, scoped edits, commit, one-time push', async 
   const outside = await write(dir, 'src/b/y.ts', 'export const y = 1;\n');
   assert.equal(JSON.parse(outside.stdout).hookSpecificOutput.permissionDecision, 'ask');
 
-  writeFiles(dir, { 'src/a/x.ts': 'export const x = 1;\n' });
-  git(dir, ['add', 'src/a/x.ts', 'docs/changes/c1.md']);
-  assert.equal((await bash(dir, 'git commit -m "feat: add x"')).code, 2, 'commit not approved');
-  assert.match((await prompt(dir, 'next?')).stdout, /then owner: \/keel:approve commit/);
+  writeFiles(dir, { 'src/a/x.ts': 'export const x = 1;\n', 'README.md': 'notes\n' });
+  git(dir, ['add', 'src/a/x.ts', 'docs/changes/c1.md', 'README.md']);
+  const outsidePlan = await bash(dir, 'git commit -m "feat: add x"');
+  assert.equal(outsidePlan.code, 2, 'README.md is outside the plan, so the plan does not cover this commit');
+  assert.match(outsidePlan.stderr, /outside the plan: README\.md/);
+  assert.match((await prompt(dir, 'next?')).stdout, /the plan covers them[\s\S]*otherwise owner: \/keel:approve commit/);
   assert.match((await prompt(dir, '/keel:approve commit')).stdout, /commit approved/);
   assert.match((await prompt(dir, 'next?')).stdout, /approved exactly the staged changes: commit them now/);
   assert.equal((await bash(dir, 'git commit -m "feat: add x"')).code, 0);
-  writeFiles(dir, { 'src/a/x.ts': 'export const x = 2;\n' });
-  git(dir, ['add', 'src/a/x.ts']);
+  writeFiles(dir, { 'src/a/x.ts': 'export const x = 2;\n', 'README.md': 'more notes\n' });
+  git(dir, ['add', 'src/a/x.ts', 'README.md']);
   assert.equal((await bash(dir, 'git commit -m "feat: add x"')).code, 2, 'staged diff changed after approval');
   git(dir, ['commit', '-qm', 'feat: add x']);
 
@@ -219,6 +221,18 @@ test('a verified turn is recorded in the hook-only store and skips re-checking',
   assert.equal((await guard(dir, 'stop', { last_assistant_message: 'done' })).stdout, '');
   assert.match(readFileSync(join(dir, '.keel/state/approvals.jsonl'), 'utf8'), /"type":"green"/);
   assert.match((await keel(dir, ['status'])).stdout, /last verified: /);
+});
+
+test('the stop guard records how long its checks took', async () => {
+  const dir = adoptedRepo({ 'tools/x/notes.md': 'a\n' });
+  writeFiles(dir, { '.keel/config.json': JSON.stringify({ keel: '0.1', paths: { source: ['src/**'] }, packages: ['tools/*'], checks: [{ id: 'unit', run: 'echo unit', stages: ['stop'] }] }) });
+  git(dir, ['commit', '-qam', 'config']);
+  writeFileSync(join(dir, 'tools/x/notes.md'), 'b\n');
+  assert.equal((await guard(dir, 'stop', { last_assistant_message: 'done' })).stdout, '');
+  const runs = readFileSync(join(dir, '.keel/state/metrics.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].kind, 'stop');
+  assert.deepEqual(runs[0].checks.map((/** @type {any} */ c) => [c.id, c.ok]), [['unit', true]]);
 });
 
 test('keel check and keel diff-audit report canonically', async () => {

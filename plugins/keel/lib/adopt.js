@@ -171,7 +171,7 @@ export function adoptCommand(args, io) {
       if (files.length > 0) io.stdout.write(`${label}: ${files.join(', ')}\n`);
     }
     for (const note of r.notes) io.stdout.write(`note: ${note}\n`);
-    io.stdout.write('keel: adopted. Run `keel doctor`, restart Claude Code to load the hooks and settings, then review and commit the project layer.\n');
+    io.stdout.write('keel: adopted. Run `keel doctor`, then `keel sandbox-test` in your own terminal to prove the toolchain works inside the sandbox, restart Claude Code to load the hooks and settings, then review and commit the project layer.\n');
     return 0;
   } catch (err) {
     if (!(err instanceof AdoptError)) throw err;

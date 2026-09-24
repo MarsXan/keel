@@ -7,7 +7,7 @@ import { currentBranch, DIFF_FLAGS, run } from './git.js';
  */
 
 /** The empty tree, the parent of a root commit. */
-const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+export const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 /**
  * Diff of one commit against its parent, in the same form as stagedDiff.

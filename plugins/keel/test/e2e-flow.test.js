@@ -3,7 +3,7 @@
 // guard allows it, exactly as Claude Code would run it.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { redLineIds } from '../lib/lint.js';
@@ -93,10 +93,12 @@ test('T1: from change file to one pushed branch, through every gate', async () =
   assert.doesNotMatch((await s.stop('T-1 is done: node --test passes.')).stdout, /"block"/);
   assert.equal((await s.sh('keel task T-1 done')).code, 0);
 
+  writeFileSync(join(dir, 'notes.txt'), 'scratch\n');
   assert.equal((await s.sh('git add docs/changes/1-sum.md src/sum.js src/sum.test.js')).ran?.status, 0);
-  assert.match((await s.sh('git commit -qm "feat: add sum"')).stderr, /\/keel:approve commit/);
-  assert.match((await s.owner('/keel:approve commit')).stdout, /commit approved/);
+  assert.match((await s.sh('git commit -qm "feat: add sum"')).stderr, /not staged[\s\S]*notes\.txt/, 'a covered commit is the whole verified tree');
+  rmSync(join(dir, 'notes.txt'));
   const commit = await s.sh('git commit -qm "feat: add sum"');
+  assert.equal(commit.code, 0, commit.stderr);
   assert.equal(commit.ran?.status, 0, commit.ran?.stderr);
 
   assert.match((await s.sh('git push -q -u origin feat/1-sum')).stderr, /\/keel:approve pr/);

@@ -9,14 +9,14 @@
     {
       "name": "keel",
       "description": "Tiered, human-gated agentic workflow with deterministic, fail-closed guardrails",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "category": "development",
       "source": "./plugins/keel"
     },
     {
       "name": "keel-nestjs",
       "description": "Keel stack pack for clean-architecture NestJS pnpm monorepos",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "category": "development",
       "source": "./plugins/keel-nestjs"
     }

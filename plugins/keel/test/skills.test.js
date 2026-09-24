@@ -15,10 +15,10 @@ const PHRASES = {
   start: [/keel use/, /Tiers only go up/, /gh issue/, /git switch -c/, /Never work on a protected branch/],
   spec: [/one question at a time/, /REQ-1: Given/, /\/keel:approve spec/, /keel lint-change --stage spec/],
   plan: [/keel:explorer/, /keel:planner/, /\/keel:approve plan/, /keel lint-change --stage plan/, /done-when/],
-  build: [/keel task T-n red/, /keel:test-writer/, /keel:implementer/, /keel check/, /Confirm RED yourself/, /ESCALATE:/],
+  build: [/keel task T-n red/, /keel:test-writer/, /keel:implementer/, /keel check/, /Confirm RED yourself/, /ESCALATE:/, /git commit -m/, /plan covers the commit/],
   verify: [/keel:verifier/, /keel check --stage ci/, /## Verification/],
   review: [/keel:reviewer-spec/, /intent_gap/, /bad_spec/, /three rounds/, /ESCALATE:/],
-  ship: [/## Deltas/, /\/keel:approve commit/, /\/keel:approve pr/, /Never merge, tag or release/, /--no-verify/],
+  ship: [/## Deltas/, /\/keel:approve commit/, /\/keel:approve pr/, /Never merge, tag or release/, /--no-verify/, /plan covers it/, /cannot use SSH keys/],
   spike: [/throwaway|Throwaway/, /spike\//, /\/keel:approve plan/],
   amend: [/## Amendment/, /\/keel:approve amend/, /docs\/adr\//, /Guardrail-Change:/, /through Bash/],
   audit: [/keel audit --metrics/, /keel:auditor/, /gh issue list/, /Never fix anything during the audit/],
@@ -26,6 +26,11 @@ const PHRASES = {
   approve: [/You cannot approve anything yourself/, /bound to content/, /one-time token/],
   status: [/keel status/],
 };
+
+test('every workflow command the tests describe exists as a skill', () => {
+  const present = new Set(readdirSync(dir));
+  assert.deepEqual([...USER_ONLY, ...DISCIPLINES].filter((name) => !present.has(name)), []);
+});
 
 for (const name of readdirSync(dir)) {
   test(`skill ${name} honours the SKILL.md contract`, () => {

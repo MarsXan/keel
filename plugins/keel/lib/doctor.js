@@ -13,7 +13,7 @@ import { readText, resolveRoot } from './context.js';
 import { isRepo, run } from './git.js';
 import { gitHooksInstalled } from './githooks.js';
 import { lineCount } from './policy/content.js';
-import { APPROVALS_SANDBOX_PATH, BASH_DENY, STATE_EDIT_DENY } from './settings.js';
+import { APPROVALS_SANDBOX_PATH, BASH_DENY, sandboxHash, STATE_EDIT_DENY } from './settings.js';
 import { sha256 } from './hash.js';
 
 /**
@@ -67,6 +67,7 @@ export function runDoctor(root, opts = {}) {
   const local = readJson(join(root, '.claude/settings.local.json')) ?? {};
   const user = readJson(join(home, '.claude/settings.json')) ?? {};
   checkSandbox(project, add);
+  checkSandboxTest(root, project, add);
   const deny = project.permissions?.deny ?? [];
   const missing = [...BASH_DENY.filter((r) => /stash|--force\*\)|commit --no-verify\*\)|reset --hard\*\)|sudo/.test(r)), STATE_EDIT_DENY].filter((r) => !deny.includes(r));
   add('settings.deny', missing.length === 0 ? 'pass' : 'fail', missing.length === 0 ? 'required deny rules present' : `missing deny rules: ${missing.join(', ')}`);
@@ -165,6 +166,30 @@ function checkSandbox(settings, add) {
   const denyWrite = sb.filesystem?.denyWrite ?? [];
   if (!denyWrite.some((p) => p === APPROVALS_SANDBOX_PATH || p === './.keel/state' || p === './.keel')) problems.push(`sandbox.filesystem.denyWrite lacks ${APPROVALS_SANDBOX_PATH}`);
   add('settings.sandbox', problems.length === 0 ? 'pass' : 'fail', problems.length === 0 ? 'sandbox protects Keel state and guardrail files' : problems.join('; '));
+}
+
+/**
+ * Whether `keel sandbox-test` proved the toolchain inside the current sandbox settings.
+ * @param {string} root
+ * @param {Record<string, any>} settings the project's .claude/settings.json
+ * @param {(id: string, level: DoctorResult['level'], message: string) => void} add
+ */
+function checkSandboxTest(root, settings, add) {
+  const record = readJson(join(root, '.keel/state/sandbox-test.json'));
+  if (!record) {
+    add('sandbox.tested', 'warn', 'the toolchain has not been tried inside the sandbox yet: run `keel sandbox-test` in your own terminal');
+    return;
+  }
+  if (record.settings !== sandboxHash(settings)) {
+    add('sandbox.tested', 'warn', 'the sandbox settings changed since the last sandbox test: run `keel sandbox-test` again');
+    return;
+  }
+  const failed = (Array.isArray(record.results) ? record.results : []).filter((r) => r?.status === 'fail').map((r) => r.id);
+  add(
+    'sandbox.tested',
+    failed.length === 0 ? 'pass' : 'warn',
+    failed.length === 0 ? `the toolchain works inside the sandbox (tested ${String(record.ts ?? '').slice(0, 10)})` : `the last sandbox test failed: ${failed.join(', ')} (keel sandbox-test prints the fixes)`,
+  );
 }
 
 /** @param {Record<string, Record<string, any>>} sources @param {(id: string, level: DoctorResult['level'], message: string) => void} add */

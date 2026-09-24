@@ -46,7 +46,7 @@
               "guard",
               "bash"
             ],
-            "timeout": 30
+            "timeout": 600
           }
         ]
       },

@@ -1,9 +1,9 @@
 {
   "name": "keel-nestjs",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Keel stack pack for clean-architecture NestJS pnpm monorepos: checker configs proven by canaries, path-scoped rules and a bounded-context scaffold",
   "author": { "name": "Mohsen" },
   "license": "MIT",
   "keywords": ["keel", "nestjs", "clean-architecture", "monorepo", "dependency-cruiser", "eslint", "vitest"],
-  "dependencies": [{ "name": "keel", "version": "^0.4.0" }]
+  "dependencies": [{ "name": "keel", "version": "^0.5.0" }]
 }

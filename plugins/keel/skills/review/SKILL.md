@@ -6,8 +6,9 @@ allowed-tools: Bash(keel status) Bash(keel check *) Bash(git diff *) Bash(gh iss
 ---
 # Review the active change
 
-1. **Run the reviewers.** The work is not committed yet, so diff the working tree against the
-   merge base: `git diff $(git merge-base <base> HEAD)` for the text and
+1. **Run the reviewers** — once per pull request, over the whole branch. Tasks are committed
+   and some work may not be, so diff the working tree against the merge base, which covers
+   both: `git diff $(git merge-base <base> HEAD)` for the text and
    `git diff --name-only $(git merge-base <base> HEAD)` plus
    `git ls-files --others --exclude-standard` for the files (new files are untracked). Give
    each reviewer the change file path, the files and the diff text — `keel:reviewer-spec` and

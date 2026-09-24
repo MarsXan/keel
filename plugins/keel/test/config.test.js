@@ -89,3 +89,17 @@ test('defaults are deeply frozen', () => {
     DEFAULT_CONFIG.caps.fileLines = 1;
   });
 });
+
+test('sandbox probes are validated', () => {
+  assert.deepEqual(validateConfig({ keel: '0.1', sandboxProbes: [{ id: 'pnpm', run: 'pnpm --version', why: 'installs', fix: 'keep the store here', requires: 'pnpm --version', whenFiles: ['pnpm-workspace.yaml'], note: false }] }), []);
+  const errors = validateConfig({
+    keel: '0.1',
+    sandboxProbes: [
+      { id: 'Bad Id', run: '', why: 'w', fix: 'f', extra: 1 },
+      { id: 'x', run: 'a\nb', why: 'w', fix: 'f' },
+      { id: 'x', run: 'c', why: 'w', fix: '', note: 'yes', whenFiles: 'compose.yaml' },
+    ],
+  }).join('\n');
+  for (const re of [/\[0\]\.extra: unknown key/, /\[0\]\.id: expected a lowercase id/, /\[0\]\.run: expected a non-empty string/, /\[1\]\.run: expected a single line/, /\[2\]\.id: duplicate id "x"/, /\[2\]\.fix/, /\[2\]\.note/, /\[2\]\.whenFiles/]) assert.match(errors, re);
+  assert.deepEqual(DEFAULT_CONFIG.sandboxProbes, []);
+});

@@ -59,7 +59,11 @@ export function adoptionState(root) {
 export function loadActiveChange(root, config, current) {
   const id = typeof current.change === 'string' ? current.change : null;
   if (!id) return null;
-  const rel = typeof current.file === 'string' && existsSync(join(root, current.file)) ? current.file : findChangeFile(root, config, id);
+  // current.json is written by commands the agent runs, so its file hint counts only when it
+  // names a change file: a Markdown file inside the changes folder.
+  const folder = `${config.paths.changes.replace(/\/+$/, '')}/`;
+  const hint = typeof current.file === 'string' && current.file.startsWith(folder) && current.file.endsWith('.md') && !current.file.split('/').includes('..') ? current.file : null;
+  const rel = hint && existsSync(join(root, hint)) ? hint : findChangeFile(root, config, id);
   const text = rel ? readText(join(root, rel)) : null;
   if (!rel || text === null) return null;
   const parsed = parseChange(text);

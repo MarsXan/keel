@@ -4,6 +4,7 @@
  * pinned plugins. Generated from the project configuration so protected paths stay in one
  * place; `keel adopt` writes it and `keel doctor` checks it.
  */
+import { sha256 } from './hash.js';
 
 /** Fallback deny rules, enforced by Claude Code itself even if a hook fails open. */
 export const BASH_DENY = [
@@ -54,6 +55,30 @@ export const DEV_DOMAINS = ['github.com', 'api.github.com', 'codeload.github.com
  * permission rules.
  */
 export const SANDBOX_EXCLUDED = ['gh *'];
+
+/**
+ * JSON with object keys sorted: Claude Code rewrites settings files, and a reordered block is
+ * the same block.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const obj = /** @type {Record<string, unknown>} */ (value);
+    return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/**
+ * Fingerprint of a settings object's sandbox block: `keel sandbox-test` records it, and
+ * `keel doctor` asks for a new test when it changes.
+ * @param {Record<string, any>} settings
+ */
+export function sandboxHash(settings) {
+  return sha256(canonicalJson(settings.sandbox ?? null));
+}
 
 /**
  * Permission-rule form of a protected glob: basename patterns apply at any depth.

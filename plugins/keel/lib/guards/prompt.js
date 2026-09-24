@@ -24,9 +24,9 @@ import { reminder } from '../status.js';
 
 const NEXT = {
   spec: 'Next: write Design and Tasks, then ask for /keel:approve plan. Editing Intent or Requirements now voids this approval.',
-  plan: 'Source and test edits for the planned files are now allowed. Editing Design or Tasks voids this approval.',
+  plan: 'Source and test edits for the planned files are now allowed, and each commit of them is covered once the checks pass. Editing Design or Tasks voids this approval.',
   amend: 'Edits to the protected files described in the Amendment are allowed; the owner still confirms each one.',
-  scope: 'Files in this scope may now be edited under the plan.',
+  scope: 'Files in this scope may now be edited and committed under the plan.',
   commit: 'Commit exactly the staged changes now with a plain git commit -m "…"; changing what is staged voids this approval.',
   pr: 'One push of this branch and one pull request may now be made; committing again voids the token.',
   diff: 'The working tree as it is now is approved.',

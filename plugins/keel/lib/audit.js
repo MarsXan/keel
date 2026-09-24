@@ -6,7 +6,7 @@
  * the code churns and what debt it carries, and — with --metrics — rework and flow.
  */
 import { homedir } from 'node:os';
-import { changeFlow, fixShare, hotspots, ledgerEvents, treeHealth } from './audit-metrics.js';
+import { changeFlow, fixShare, hotspots, keelCost, ledgerEvents, treeHealth } from './audit-metrics.js';
 import { knowledgeItems } from './audit-knowledge.js';
 import { buildContext } from './context.js';
 import { runDoctor } from './doctor.js';
@@ -21,7 +21,7 @@ import { isRepo } from './git.js';
  * @property {Item[]} harness
  * @property {import('./audit-metrics.js').Hotspot[]} hotspots
  * @property {ReturnType<typeof treeHealth>} tree
- * @property {{ fixShare: import('./audit-metrics.js').MonthShare[], changes: ReturnType<typeof changeFlow>, ledger: ReturnType<typeof ledgerEvents> } | null} metrics
+ * @property {{ fixShare: import('./audit-metrics.js').MonthShare[], changes: ReturnType<typeof changeFlow>, ledger: ReturnType<typeof ledgerEvents>, cost: ReturnType<typeof keelCost> } | null} metrics
  */
 
 /**
@@ -41,7 +41,7 @@ export function runAudit(root, config, { metrics = false, home = homedir(), env 
     harness,
     hotspots: hotspots(root, config),
     tree: treeHealth(root, config),
-    metrics: metrics ? { fixShare: fixShare(root), changes: changeFlow(root, config), ledger: ledgerEvents(root, { now }) } : null,
+    metrics: metrics ? { fixShare: fixShare(root), changes: changeFlow(root, config), ledger: ledgerEvents(root, { now }), cost: keelCost(root, { now }) } : null,
   };
 }
 
@@ -71,8 +71,26 @@ export function renderAudit(r) {
     out.push('', `Changes: ${c.total} (tiers: ${list(c.tiers)}; status: ${list(c.statuses)}).`);
     out.push(`First-pass acceptance — done T1/T2 changes whose review routed nothing back to the build: ${c.firstPass} of ${c.done} (${pct(c.firstPass, c.done)}).`);
     out.push(m.ledger.available ? `Last 30 days (local ledgers): ${m.ledger.escalations} escalation(s), ${m.ledger.unverified} unverified turn(s).` : 'No local ledgers on this machine (escalations and unverified turns are recorded where the agent runs).');
+    out.push('', ...renderCost(m.cost, list));
   }
   return `${out.join('\n')}\n`;
+}
+
+/**
+ * What the gates cost, next to what they catch: if checks slow every turn or approvals pile
+ * up, the numbers show it.
+ * @param {ReturnType<typeof keelCost>} c
+ * @param {(o: Record<string, number>) => string} list
+ */
+function renderCost(c, list) {
+  const sec = (/** @type {number | null} */ ms) => (ms === null ? '—' : `${(ms / 1000).toFixed(1)} s`);
+  const out = ["Keel's cost — last 30 days, from this machine's records:"];
+  if (c.turns === 0 && c.approvals.total === 0 && c.commits.covered === 0) return [...out, 'No local records yet (Keel writes them where the agent runs).'];
+  out.push(`- End-of-turn checks: ${c.turns} verified turn(s), median ${sec(c.turnMs.median)}, p90 ${sec(c.turnMs.p90)}${c.slowest ? `; slowest check: ${c.slowest.id} (median ${sec(c.slowest.medianMs)})` : ''}.`);
+  out.push(`- Commits: ${c.commits.covered} covered by an approved plan, ${c.commits.approved} approved one by one.`);
+  out.push(`- Owner approvals: ${c.approvals.total} (${list(c.approvals.byKind)})${c.approvals.perChangeMedian === null ? '' : `, median ${c.approvals.perChangeMedian} per change`}.`);
+  out.push(`- Start to pull-request approval: ${c.startToPr.medianHours === null ? 'no change has reached it yet' : `median ${c.startToPr.medianHours.toFixed(1)} h over ${c.startToPr.changes} change(s)`}.`);
+  return out;
 }
 
 /** @type {import('./cli.js').Command} */

@@ -67,7 +67,8 @@ export function packFiles() {
 
 /**
  * Merges the pack's configuration fragment: lists only gain entries, per-path caps only
- * tighten, and a check with a pack check's id keeps its command but gains the pack's stages.
+ * tighten, a check with a pack check's id keeps its command but gains the pack's stages, and
+ * sandbox probes are added unless the project has one with the same id.
  * @param {Json} config the project's .keel/config.json
  * @param {Json} fragment
  * @returns {Json}
@@ -91,6 +92,10 @@ export function mergeConfig(config, fragment) {
     // The project's own command wins, but it runs at least wherever the pack's would.
     if (existing) existing.stages = [...new Set([...(existing.stages ?? []), ...check.stages])];
     else out.checks.push(check);
+  }
+  if (fragment.sandboxProbes) {
+    out.sandboxProbes ??= [];
+    for (const probe of fragment.sandboxProbes) if (!out.sandboxProbes.some((/** @type {Json} */ p) => p.id === probe.id)) out.sandboxProbes.push(probe);
   }
   return out;
 }
@@ -207,7 +212,7 @@ export function adoptCommand(args, io) {
     if (r.merged.length > 0) io.stdout.write(`merged: ${r.merged.join('; ')}\n`);
     for (const note of r.notes) io.stdout.write(`note: ${note}\n`);
     io.stdout.write(
-      'keel-nestjs: installed. Next: install the tools, run keel-nestjs canaries and keel doctor, then review and commit. ' +
+      'keel-nestjs: installed. Next: install the tools, run keel-nestjs canaries, keel doctor and — in your own terminal — keel sandbox-test, then review and commit. ' +
         'If the Keel project layer was already committed, this is a guardrail change: it needs an approved /keel:amend and an ADR.\n',
     );
     return 0;

@@ -1,6 +1,46 @@
 # Changelog
 
-## 0.4.0 — learning loop (unreleased)
+## 0.5.0 — speed (unreleased)
+
+Keel must raise development speed, maintenance speed and code quality together; these
+changes remove waiting without removing a guarantee. Spec:
+[`docs/specs/2026-09-24-keel-speed.md`](docs/specs/2026-09-24-keel-speed.md).
+
+- **Commits covered by the plan.** An approved plan now covers its task commits: at
+  `git commit` the Bash guard checks that every staged file is the plan's (or in an approved
+  scope), nothing is left unstaged, the diff audit is clean and the end-of-turn checks pass —
+  reusing the last verified turn when the tree is the same — and then records a cover in the
+  hook-only store. Git's `pre-commit` and `reference-transaction` hooks accept a cover only
+  for that exact diff on that parent. The owner approves the spec (T2), the plan and the pull
+  request; `/keel:approve commit` remains for T0 and for anything outside the plan.
+- **`/keel:build` commits each task, and `/keel:review` runs once per pull request** over the
+  branch; `/keel:ship` commits what is left under the plan and hands an SSH push to the
+  owner's terminal.
+- **End-of-turn checks cover the change** (keel-nestjs): an incremental typecheck, and lint,
+  dependency-cruiser and `vitest related` on the changed files. `/keel:verify` and CI still run
+  everything, and a test proves each narrowed check still catches its canary.
+- **`keel sandbox-test`**, run by the owner after adoption, tries the toolchain inside the
+  sandbox through a headless Claude Code session — gh, a localhost port, the git remote and
+  the stack's probes (keel-nestjs: pnpm, docker) — and reads each outcome from the session's
+  event stream. `keel doctor` warns until a passing test matches the current sandbox settings.
+- **Keel's cost in `keel audit --metrics`:** check time per verified turn (median, p90 and the
+  slowest check), covered against individually approved commits, owner approvals per change,
+  and the time from a change's start to its pull-request approval.
+- The Bash hook's timeout is 600 s, so a commit's checks can finish.
+
+### Fixes from the 0.5 review
+- **Security:** `.keel/state/current.json`, which agent commands write, could name any file
+  as the active change file; a copy of the change file's text elsewhere then passed the plan
+  checks and escaped a covered commit's scope. Its hint now counts only for a Markdown file
+  inside the changes folder.
+- **Security:** in a project that is a folder of a larger repository, approval and cover
+  hashes cover the project's own diff, so staged files elsewhere in the repository could ride
+  along with an approved or covered commit. The covered-commit check, `pre-commit` and
+  `reference-transaction` now refuse any change outside the project.
+- The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
+  does not ask for a new sandbox test.
+
+## 0.4.0 — learning loop
 
 - **`keel audit [--metrics] [--json] [--strict]`**, the weekly drift report, read-only and
   deterministic: paths named by instruction files and living docs that no longer exist, rule

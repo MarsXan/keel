@@ -29,8 +29,10 @@ export function nextGate(ctx) {
     return section(ch.parsed, 'Design') && section(ch.parsed, 'Tasks') ? 'owner: /keel:approve plan' : 'write Design and Tasks';
   }
   return (
-    shipGate(ctx, isApproved) ??
-    (rank === 0 ? 'make the change, run keel check, stage it, then owner: /keel:approve commit' : 'build under the plan, run keel check, stage the changes, then owner: /keel:approve commit')
+    shipGate(ctx, isApproved, rank) ??
+    (rank === 0
+      ? 'make the change, run keel check, stage it, then owner: /keel:approve commit'
+      : 'build the tasks (/keel:build) and commit each one when it is done: the approved plan covers commits of its files once the checks pass')
   );
 }
 
@@ -38,13 +40,15 @@ export function nextGate(ctx) {
  * The commit/push step, when the working tree has reached it.
  * @param {GuardContext} ctx
  * @param {(what: string, hash: string) => boolean} isApproved
+ * @param {number} rank the change's tier rank (its plan is approved when rank ≥ 1)
  */
-function shipGate(ctx, isApproved) {
+function shipGate(ctx, isApproved, rank) {
   if (!isRepo(ctx.root)) return null;
   const staged = stagedDiff(ctx.root);
   if (staged.trim()) {
-    return isApproved('commit', sha256(staged))
-      ? 'the owner approved exactly the staged changes: commit them now with a plain git commit -m "…"'
+    if (isApproved('commit', sha256(staged))) return 'the owner approved exactly the staged changes: commit them now with a plain git commit -m "…"';
+    return rank >= 1
+      ? 'commit the staged changes: the plan covers them when every file is the plan\'s, nothing is left unstaged and the checks pass; otherwise owner: /keel:approve commit'
       : 'show the owner `git diff --cached --stat`, then owner: /keel:approve commit';
   }
   const token = hasToken(ctx.root, { what: 'pr', action: 'push', hash: branchHash(ctx.root, ctx.config.project.baseBranch) });

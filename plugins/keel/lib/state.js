@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * Keel state under `.keel/state/` (git-ignored): `current.json` (progress), `approvals.jsonl`
- * (append-only, written by hooks only) and `ledger/<change>.md` (handoffs and results).
+ * (append-only, written by hooks only), `metrics.jsonl` (how long checks took) and
+ * `ledger/<change>.md` (handoffs and results).
  */
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,6 +14,7 @@ export function statePaths(root) {
     dir,
     current: join(dir, 'current.json'),
     approvals: join(dir, 'approvals.jsonl'),
+    metrics: join(dir, 'metrics.jsonl'),
     ledgerDir: join(dir, 'ledger'),
   };
 }

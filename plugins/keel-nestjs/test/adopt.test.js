@@ -30,7 +30,11 @@ test('installs the checker configs and rules, merges the configuration, records 
   const config = json(dir, '.keel/config.json');
   assert.ok(config.paths.source.includes('libs/**'));
   assert.ok(config.paths.heavy.includes('**/migrations/**'));
-  assert.deepEqual(config.checks.map((c) => c.id), ['typecheck', 'lint', 'lint-all', 'arch', 'test', 'coverage']);
+  assert.deepEqual(config.checks.map((c) => c.id), ['typecheck', 'lint', 'arch', 'test', 'typecheck-all', 'lint-all', 'arch-all', 'test-all', 'coverage']);
+  for (const c of config.checks) assert.deepEqual(c.stages, [c.id.endsWith('-all') || c.id === 'coverage' ? 'ci' : 'stop'], `${c.id}: the end of a turn checks the change, CI and /keel:verify check everything`);
+  assert.match(config.checks[0].run, /--incremental/, 'the end-of-turn typecheck reuses its last run');
+  assert.deepEqual(config.sandboxProbes.map((p) => p.id), ['pnpm', 'docker'], 'keel sandbox-test tries the stack\'s tools');
+  assert.match(r.stdout, /keel sandbox-test/);
   assert.equal(config.caps.fileLinesByPath['libs/*/src/domain/**'], 200);
   const pkg = json(dir, 'package.json');
   assert.equal(pkg.scripts.test, 'vitest run --reporter=dot', 'an existing script is kept');
@@ -65,6 +69,8 @@ test('merging only tightens', () => {
   assert.equal(merged.caps.fileLinesByPath['libs/*/src/domain/**'], 150);
   assert.deepEqual(merged.checks.map((c) => c.run), ['make test', 'x']);
   assert.deepEqual(merged.checks[0].stages, ['ci', 'stop'], "the project's command runs wherever the pack's would");
+  const probes = mergeConfig({ sandboxProbes: [{ id: 'pnpm', run: 'pnpm --version', why: 'w', fix: 'f' }] }, { sandboxProbes: [{ id: 'pnpm', run: 'x', why: 'w', fix: 'f' }, { id: 'docker', run: 'docker version', why: 'w', fix: 'f' }] });
+  assert.deepEqual(probes.sandboxProbes.map((p) => p.run), ['pnpm --version', 'docker version'], "the project's own probe is kept");
 });
 
 test("an existing workspace keeps its packages and gains a store inside the project", async () => {

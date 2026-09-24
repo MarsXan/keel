@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * Git rules for commands that move refs or the index: commit (approval bound to the staged
- * diff), push (one-time token, never protected branches or force), reset, checkout/switch/
- * restore and fetch refspecs.
+ * Git rules for commands that move refs or the index: commit (an approval bound to the staged
+ * diff, or a cover by the approved plan), push (one-time token, never protected branches or
+ * force), reset, checkout/switch/restore and fetch refspecs.
  */
 import { resolvePath } from '../paths.js';
 import { allowUsing, deny } from './decision.js';
@@ -64,7 +64,9 @@ export function commitRule(args, dyn, ctx) {
     return deny(`git commit with ${denied.join(', ')} commits something other than the reviewed index. Stage exactly the intended changes with git add, get the owner's /keel:approve commit, then run a plain git commit -m "…".`);
   }
   if (dryRun || ctx.isApproved('commit', ctx.stagedDiffHash())) return null;
-  return deny('Committing needs the owner\'s approval of exactly what is staged. Stage the changes, show the owner `git diff --cached --stat`, ask them to type /keel:approve commit, then run the same commit. Changing the staged content afterwards voids the approval.');
+  const why = ctx.planCover ? ctx.planCover() : 'Keel cannot check the plan from here.';
+  if (why === null) return null;
+  return deny(`This commit is not covered by the approved plan: ${why}\nFix that and commit again, or ask the owner to type /keel:approve commit for exactly what is staged (show them \`git diff --cached --stat\`); changing the staged content afterwards voids that approval.`);
 }
 
 /** Push options that force, delete, publish tags or mirrors, reach another remote, or skip hooks. */

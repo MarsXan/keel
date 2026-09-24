@@ -3,21 +3,23 @@ import { test } from 'node:test';
 import { DEFAULT_CONFIG } from '../lib/config.js';
 import { runDoctor } from '../lib/doctor.js';
 import { sha256 } from '../lib/hash.js';
-import { editRule, keelSettings, mergeSettings, sandboxPath } from '../lib/settings.js';
+import { editRule, keelSettings, mergeSettings, sandboxHash, sandboxPath } from '../lib/settings.js';
 import { gitRepo, runCli, tmpDir, writeFiles } from './helpers.js';
 
 const levels = (root, home = tmpDir()) => Object.fromEntries(runDoctor(root, { quick: true, home }).results.map((r) => [r.id, r.level]));
 const messages = (root, home = tmpDir()) => Object.fromEntries(runDoctor(root, { quick: true, home }).results.map((r) => [r.id, r.message]));
 
-/** A repository with everything doctor expects. */
+/** A repository with everything doctor expects, its toolchain proven inside the sandbox. */
 function healthyRepo() {
   const dir = gitRepo({ commit: false });
+  const settings = keelSettings(DEFAULT_CONFIG, '/keel');
   writeFiles(dir, {
     '.gitignore': '.keel/state/\n',
     '.keel/config.json': JSON.stringify({ keel: '0.1' }),
     'CONSTITUTION.md': '# C\n- **P-1** Prefer small changes.\n- **R-1** MUST x.\n  enforced-by: keel:edit-guard\n- **R-2** MUST NOT y.\n  enforced-by: keel:bash-guard\n',
     'CLAUDE.md': '# Project\nshort\n',
-    '.claude/settings.json': JSON.stringify(keelSettings(DEFAULT_CONFIG, '/keel')),
+    '.claude/settings.json': JSON.stringify(settings),
+    '.keel/state/sandbox-test.json': JSON.stringify({ ts: '2026-09-24T10:00:00.000Z', settings: sandboxHash(settings), results: [{ id: 'localhost', status: 'pass', detail: '' }] }),
   });
   return dir;
 }

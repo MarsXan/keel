@@ -1,7 +1,7 @@
 // @ts-check
 /** Keel command-line interface: `keel <command> [args]`. */
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.0';
 
 export const USAGE = `usage: keel <command> [options]
 
@@ -18,6 +18,7 @@ commands:
   diff-audit           audit the working tree against HEAD
   ci [--base ref]      the server-side gate for a branch
   audit [--metrics] [--json] [--strict]  the weekly drift report: stale knowledge, harness, code health, rework
+  sandbox-test [--dry-run]  prove the toolchain works inside the sandbox (run it in your own terminal)
   --version            print the version`;
 
 /**
@@ -46,6 +47,7 @@ const COMMANDS = {
   ci: () => import('./ci.js').then((m) => m.ciCommand),
   'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
   audit: () => import('./audit.js').then((m) => m.auditCommand),
+  'sandbox-test': () => import('./sandbox-test.js').then((m) => m.sandboxTestCommand),
 };
 
 /** @returns {Io} */

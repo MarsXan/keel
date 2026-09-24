@@ -4,6 +4,7 @@ import { consumeToken, frozenTests, hasToken } from '../approvals.js';
 import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
+import { coverStagedCommit } from '../cover.js';
 import { readdirSync } from 'node:fs';
 import { alias, currentBranch, filesUnder, worktrees } from '../git.js';
 import { pushDestination } from '../git-history.js';
@@ -60,6 +61,9 @@ function bashGuard(input, ctx, env) {
   let staged;
   /** @type {string | undefined} */
   let branch;
+  /** @type {string | null | undefined} */
+  let cover;
+  const stagedState = () => (staged ??= stagedHash(ctx.root));
   const branchState = () => (branch ??= branchHash(ctx.root, base));
   const role = typeof input.agent_type === 'string' ? input.agent_type : '';
   /** @type {import('../policy/edit.js').EditContext | undefined} */
@@ -73,7 +77,8 @@ function bashGuard(input, ctx, env) {
     adopted: true,
     isApproved,
     hasToken: (what, action) => hasToken(ctx.root, { what: /** @type {any} */ (what), action, hash: branchState() }),
-    stagedDiffHash: () => (staged ??= stagedHash(ctx.root)),
+    stagedDiffHash: stagedState,
+    planCover: () => (cover === undefined ? (cover = coverStagedCommit(ctx, stagedState())) : cover),
     branch: () => currentBranch(ctx.root),
     pushDestination: () => pushDestination(ctx.root),
     gitAlias: (name) => alias(ctx.root, name),

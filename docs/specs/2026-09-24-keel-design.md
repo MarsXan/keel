@@ -181,8 +181,8 @@ Validated against `schemas/config.schema.json`; unknown keys fail `keel doctor`.
 | Tier | When | Flow |
 |---|---|---|
 | **T0 trivial** | docs, typos, comments, config hygiene; no source logic | change → `keel check` → commit approval |
-| **T1 bounded** | inside one existing flow in one context; no heavy paths; ≤ `tiers.t1MaxFiles` files | ≤10-line design in the change file → approval → build → verify → one reviewer → commit approval |
-| **T2 architectural** | new context/port/event/route/realtime event/migration; any `paths.heavy` match; security, money or auth code; > T1 file budget | spec → approval → plan → approval → build → verify → three reviewers → diff approval → ship |
+| **T1 bounded** | inside one existing flow in one context; no heavy paths; ≤ `tiers.t1MaxFiles` files | ≤10-line design in the change file → approval → build (each task committed, covered by the plan) → verify → one reviewer → PR approval |
+| **T2 architectural** | new context/port/event/route/realtime event/migration; any `paths.heavy` match; security, money or auth code; > T1 file budget | spec → approval → plan → approval → build (each task committed, covered by the plan) → verify → three reviewers → PR approval → ship |
 | **Spike** | a feasibility question | throwaway branch; output is findings in the change file; code discarded |
 
 The tier floor is recomputed from the plan's declared files and again from the actual diff at verify; a diff that exceeds its tier blocks until the change is re-tiered and re-approved.
@@ -222,7 +222,7 @@ created: 2026-09-24
 State is split by who may write it:
 | File | Written by | Protection |
 |---|---|---|
-| `.keel/state/approvals.jsonl` | only the `UserPromptSubmit` hook (hooks run outside the sandbox) | Edit deny + sandbox `denyWrite`, so even a forged `keel guard prompt` invocation from the agent's Bash cannot write it; the Bash guard also denies any agent invocation of `keel guard …` |
+| `.keel/state/approvals.jsonl` | only Keel's Claude Code hooks, which run outside the sandbox: the `UserPromptSubmit` hook (owner approvals), the Bash hook (task stages and plan covers of commits) and the Stop hooks (verified trees) | Edit deny + sandbox `denyWrite`, so even a forged `keel guard prompt` invocation from the agent's Bash cannot write it; the Bash guard also denies any agent invocation of `keel guard …`; git's own hooks only read it |
 | `.keel/state/current.json` | the `keel` CLI (`keel phase`, `keel task`), invoked by the coordinator | Edit deny; the CLI validates every transition (e.g. entering `build` requires a plan approval whose hash matches the current plan) |
 | `.keel/state/ledger/<change>.md` | the `keel` CLI and hooks (handoff, results, red snapshots) | Edit deny; append-only by convention |
 
