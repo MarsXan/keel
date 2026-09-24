@@ -4,7 +4,8 @@
  * and the configured checks, or the agent escalates honestly. Claude Code ends a turn after
  * 8 consecutive blocks anyway; Keel then records the turn as UNVERIFIED.
  */
-import { lastGreen, recordGreen } from '../approvals.js';
+import { frozenTests, lastGreen, recordGreen } from '../approvals.js';
+import { taskState } from '../tasks.js';
 import { approvalQueries } from '../context.js';
 import { runChecks } from '../checks.js';
 import { isRepo, worktreeFingerprint } from '../git.js';
@@ -29,8 +30,10 @@ export function stopGuard(input, ctx) {
       stdout: block(`Keel's configuration is invalid, so nothing can be verified:\n- ${ctx.configErrors.slice(0, 5).join('\n- ')}\nThe owner must fix .keel/config.json. Reply with a line starting "ESCALATE:" to hand this to the owner.`),
     };
   }
+  const task = taskState(ctx.root, changeId).current;
+  const frozen = task?.stage === 'red' ? {} : frozenTests(ctx.root, changeId);
   const d = evaluateStop(input, {
-    audit: () => auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: ctx.current.task?.frozenTests ?? {} }),
+    audit: () => auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen }),
     diffHash: () => worktreeFingerprint(ctx.root),
     runChecks: (files, packages) => runChecks(ctx.root, ctx.config, 'stop', { files, packages }),
     current: { lastGreen: lastGreen(ctx.root)?.hash ?? null },

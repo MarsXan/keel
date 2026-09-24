@@ -6,6 +6,7 @@ import { section, tierRank } from './changefile.js';
 import { approvalQueries, buildContext } from './context.js';
 import { isRepo, stagedDiff } from './git.js';
 import { sha256, shortHash } from './hash.js';
+import { taskState } from './tasks.js';
 
 /**
  * @typedef {import('./context.js').GuardContext} GuardContext
@@ -91,7 +92,7 @@ export function statusText(ctx) {
     if (tierRank(ch.tier) >= 1) lines.push(`plan: ${mark('plan')}`);
     if (section(ch.parsed, 'Amendment')) lines.push(`amendment: ${mark('amend')}`);
   }
-  const task = ctx.current.task;
+  const task = taskState(ctx.root, ctx.change?.id ?? null).current;
   if (task) lines.push(`task: ${task.id} (${task.stage})`);
   const green = lastGreen(ctx.root);
   if (green) lines.push(`last verified: ${green.ts} (${shortHash(green.hash)}${green.checks ? `; ${green.checks}` : ''})`);

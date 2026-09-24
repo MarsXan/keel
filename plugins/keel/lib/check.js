@@ -5,9 +5,11 @@
  * verified state.
  */
 import { runChecks } from './checks.js';
+import { frozenTests } from './approvals.js';
 import { approvalQueries, buildContext } from './context.js';
 import { isRepo } from './git.js';
 import { auditWorkingTree } from './policy/diffaudit.js';
+import { taskState } from './tasks.js';
 
 /**
  * @typedef {import('./cli.js').Io} Io
@@ -30,8 +32,9 @@ function context(io) {
 
 /** @param {GuardContext} ctx */
 function audit(ctx) {
-  const { isApproved } = approvalQueries(ctx);
-  return auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: ctx.current.task?.frozenTests ?? {} });
+  const { changeId, isApproved } = approvalQueries(ctx);
+  const frozen = taskState(ctx.root, changeId).current?.stage === 'red' ? {} : frozenTests(ctx.root, changeId);
+  return auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen });
 }
 
 /** @param {Io} io @param {string[]} findings */

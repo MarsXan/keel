@@ -11,6 +11,7 @@ import { block, clip, context } from '../io.js';
 import { amendApproved } from '../policy/authority.js';
 import { appendLedger, updateCurrent } from '../state.js';
 import { statusText } from '../status.js';
+import { taskState } from '../tasks.js';
 
 /**
  * @typedef {import('../guards.js').Guard} Guard
@@ -58,7 +59,7 @@ function subagentStart(input, ctx) {
   const ch = ctx.change;
   if (ch) {
     lines.push(`Active change ${ch.id} (${ch.tier}). Intent:`, section(ch.parsed, 'Intent') || '(not written)');
-    const task = ctx.current.task;
+    const task = taskState(ctx.root, ch.id).current;
     const declared = task ? tasks(ch.parsed).find((t) => t.id === task.id) : undefined;
     if (task) lines.push(`Current task ${task.id} (${task.stage})${declared ? `: files ${declared.files.join(', ') || '(none declared)'}` : ''}`);
   }

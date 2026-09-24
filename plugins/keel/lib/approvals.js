@@ -156,3 +156,30 @@ export function lastGreen(root) {
 export function approvedHashes(root, what) {
   return new Set(records(root).filter((r) => r.type === 'approve' && r.what === what).map((r) => /** @type {ApprovalRecord} */ (r).hash));
 }
+
+/**
+ * Appends a hook-recorded fact (task stage, test freeze) to the trusted store.
+ * @param {string} root
+ * @param {Record<string, unknown> & { type: string }} record
+ */
+export function recordTrusted(root, record) {
+  appendJsonl(statePaths(root).approvals, { ts: new Date().toISOString(), ...record });
+}
+
+/** Every record in the trusted store, oldest first. @param {string} root @returns {any[]} */
+export function trustedRecords(root) {
+  return records(root);
+}
+
+/**
+ * Test hashes frozen for a change (later freezes of the same file win).
+ * @param {string} root
+ * @param {string | null} change
+ * @returns {Record<string, string>}
+ */
+export function frozenTests(root, change) {
+  /** @type {Record<string, string>} */
+  const files = {};
+  for (const r of /** @type {any[]} */ (records(root))) if (r.type === 'freeze' && r.change === change) Object.assign(files, r.files);
+  return files;
+}

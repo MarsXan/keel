@@ -9,6 +9,7 @@ commands:
   guard <event>        hook entry point (run by Claude Code only)
   status               active change, tier, approvals and the next gate
   use <change-id>      make docs/changes/<change-id>.md the active change
+  task <T-n> <stage>   move a task through red → green → refactor → done
   doctor [--quick]     audit configuration, settings, permissions and the constitution
   adopt [options]      write the Keel project layer into this repository
   lint-change [file]   lint a change file (default: the active change) [--stage spec|plan|verify]
@@ -32,6 +33,7 @@ const COMMANDS = {
   guard: () => import('./guards.js').then((m) => m.guardCommand),
   status: () => import('./status.js').then((m) => m.statusCommand),
   use: () => import('./use.js').then((m) => m.useCommand),
+  task: () => import('./tasks.js').then((m) => m.taskCommand),
   doctor: () => import('./doctor.js').then((m) => m.doctorCommand),
   adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
   check: () => import('./check.js').then((m) => m.checkCommand),

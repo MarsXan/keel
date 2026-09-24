@@ -12,6 +12,7 @@ import { evaluateBash } from '../policy/bash.js';
 import { packagesOf } from '../policy/diffaudit.js';
 import { evaluateEdit } from '../policy/edit.js';
 import { loadShellSnapshot } from '../shell-snapshot.js';
+import { recordTransitions, taskState } from '../tasks.js';
 import { join, resolve } from 'node:path';
 
 /**
@@ -62,6 +63,8 @@ function bashGuard(input, ctx, env) {
     shell: loadShellSnapshot(ctx.home, env),
   });
   if (d.decision === 'allow') {
+    const refused = recordTransitions(command, ctx);
+    if (refused) return answer({ decision: 'deny', reason: refused });
     for (const c of d.consume ?? []) consumeToken(ctx.root, { what: /** @type {any} */ (c.what), action: c.action, hash: branchState() });
   }
   return answer(d);
@@ -77,7 +80,7 @@ function editGuard(input, ctx) {
         root: ctx.root,
         config: ctx.config,
         configErrors: ctx.configErrors,
-        current: ctx.current,
+        current: { ...ctx.current, task: taskState(ctx.root, ctx.change?.id ?? null).current },
         change: ctx.change,
         isApproved,
         approvedScopes,
