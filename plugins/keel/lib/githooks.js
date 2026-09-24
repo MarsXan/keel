@@ -1,0 +1,130 @@
+// @ts-check
+/**
+ * Git hooks: the second layer for commits and pushes. However an agent reaches git — shell
+ * aliases, scripts, commands assembled at run time — git itself runs these hooks. Inside a
+ * Claude Code session they re-check the owner's approvals; in the owner's own terminal
+ * (no CLAUDECODE) they do nothing.
+ */
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+import { latestApproval } from './approvals.js';
+import { branchHash, stagedHash } from './artifacts.js';
+import { approvalQueries, buildContext } from './context.js';
+import { headSha, run } from './git.js';
+
+export const GIT_HOOKS = ['pre-commit', 'pre-merge-commit', 'pre-push'];
+const MARK = '# keel-git-hook';
+const MANAGERS = ['.husky', 'lefthook.yml', '.lefthook.yml', 'lefthook.yaml', '.pre-commit-config.yaml', '.simple-git-hooks.json'];
+
+/** @param {string} name */
+export function hookScript(name) {
+  return `#!/bin/sh
+${MARK}
+# Installed by Keel. Inside a Claude Code session this re-checks the owner's approval;
+# in your own terminal (no CLAUDECODE) it does nothing.
+[ "$CLAUDECODE" = "1" ] || exit 0
+if ! command -v keel >/dev/null 2>&1; then
+  echo "keel: the keel CLI is not on PATH in this Claude Code session; refusing (fail closed)." >&2
+  exit 1
+fi
+exec keel git-hook ${name} "$@"
+`;
+}
+
+/**
+ * Installs Keel's hooks into the repository's hooks directory, never over hooks it did not
+ * write. With a hooks manager (husky, lefthook, pre-commit) or core.hooksPath it returns
+ * instructions instead.
+ * @param {string} root
+ * @returns {{ installed: string[], skipped: string[], instructions: string | null }}
+ */
+export function installGitHooks(root) {
+  const hooksPath = run(root, ['config', '--get', 'core.hooksPath'], { allowFail: true })?.trim();
+  const managers = MANAGERS.filter((f) => existsSync(join(root, f)));
+  const instructions = (/** @type {string} */ why) =>
+    `${why}: add \`keel git-hook <hook>\` to your pre-commit, pre-merge-commit and pre-push hooks (it exits 0 outside Claude Code), and add the hook files to paths.protected in .keel/config.json.`;
+  if (hooksPath || managers.length > 0) {
+    return { installed: [], skipped: [...GIT_HOOKS], instructions: instructions(hooksPath ? `core.hooksPath is set (${hooksPath})` : `a hooks manager is in use (${managers.join(', ')})`) };
+  }
+  const dirOut = run(root, ['rev-parse', '--git-path', 'hooks'], { allowFail: true })?.trim();
+  if (!dirOut) return { installed: [], skipped: [...GIT_HOOKS], instructions: 'not a git repository; git hooks were not installed' };
+  const dir = isAbsolute(dirOut) ? dirOut : join(root, dirOut);
+  mkdirSync(dir, { recursive: true });
+  /** @type {string[]} */
+  const installed = [];
+  /** @type {string[]} */
+  const skipped = [];
+  for (const name of GIT_HOOKS) {
+    const file = join(dir, name);
+    if (existsSync(file) && !readFileSync(file, 'utf8').includes(MARK)) {
+      skipped.push(name);
+      continue;
+    }
+    writeFileSync(file, hookScript(name));
+    chmodSync(file, 0o755);
+    installed.push(name);
+  }
+  return { installed, skipped, instructions: skipped.length > 0 ? instructions(`existing hooks were kept (${skipped.join(', ')})`) : null };
+}
+
+/** True when every Keel hook is installed in the hooks directory. @param {string} root */
+export function gitHooksInstalled(root) {
+  const dirOut = run(root, ['rev-parse', '--git-path', 'hooks'], { allowFail: true })?.trim();
+  const hooksPath = run(root, ['config', '--get', 'core.hooksPath'], { allowFail: true })?.trim();
+  const dir = hooksPath ? (isAbsolute(hooksPath) ? hooksPath : join(root, hooksPath)) : dirOut ? (isAbsolute(dirOut) ? dirOut : join(root, dirOut)) : null;
+  if (!dir) return false;
+  return GIT_HOOKS.every((name) => {
+    try {
+      return readFileSync(join(dir, name), 'utf8').includes('keel git-hook');
+    } catch {
+      return false;
+    }
+  });
+}
+
+/** @param {NodeJS.ReadableStream & { isTTY?: boolean }} stream */
+function readLines(stream) {
+  if (stream.isTTY) return Promise.resolve([]);
+  return new Promise((resolve, reject) => {
+    let text = '';
+    stream.on('data', (d) => (text += d));
+    stream.on('end', () => resolve(text.split('\n').filter(Boolean)));
+    stream.on('error', reject);
+  });
+}
+
+/** @type {import('./cli.js').Command} */
+export async function gitHookCommand(args, io) {
+  const name = args[0];
+  if (io.env.CLAUDECODE !== '1') return 0;
+  const ctx = buildContext({ cwd: io.cwd }, io.env);
+  if (ctx.adoption === 'none') return 0;
+  const fail = (/** @type {string} */ why) => {
+    io.stderr.write(`keel (git ${name}): ${why}\n`);
+    return 1;
+  };
+  if (name === 'pre-commit') {
+    const { isApproved } = approvalQueries(ctx);
+    return isApproved('commit', stagedHash(ctx.root)) ? 0 : fail('this commit was not approved by the owner. Ask them to type /keel:approve commit for exactly what is staged.');
+  }
+  if (name === 'pre-merge-commit') return fail('merges are the owner\'s call.');
+  if (name !== 'pre-push') return fail('unknown hook');
+  const protectedBranches = ctx.config.project.protectedBranches;
+  const head = headSha(ctx.root);
+  for (const line of await readLines(io.stdin)) {
+    const [, localOid, remoteRef, remoteOid] = line.split(' ');
+    if (/^0+$/.test(localOid)) return fail('deleting remote refs is not allowed.');
+    if (!remoteRef?.startsWith('refs/heads/')) return fail(`pushing ${remoteRef} is not allowed; push one feature branch.`);
+    const branch = remoteRef.slice('refs/heads/'.length);
+    if (protectedBranches.includes(branch)) return fail(`pushing to the protected branch "${branch}" is never allowed.`);
+    if (!/^0+$/.test(remoteOid) && run(ctx.root, ['merge-base', '--is-ancestor', remoteOid, localOid], { allowFail: true }) === null) {
+      return fail('this push would rewrite the remote branch (force push); not allowed.');
+    }
+    if (localOid !== head) return fail('only the current branch may be pushed.');
+  }
+  const approval = latestApproval(ctx.root, { what: 'pr' });
+  if (!approval || approval.hash !== branchHash(ctx.root, ctx.config.project.baseBranch)) {
+    return fail('this branch has no push approval for its current state. Ask the owner to type /keel:approve pr.');
+  }
+  return 0;
+}

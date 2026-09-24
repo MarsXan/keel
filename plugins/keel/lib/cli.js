@@ -34,6 +34,7 @@ const COMMANDS = {
   doctor: () => import('./doctor.js').then((m) => m.doctorCommand),
   adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
   check: () => import('./check.js').then((m) => m.checkCommand),
+  'git-hook': () => import('./githooks.js').then((m) => m.gitHookCommand),
   'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
 };
 

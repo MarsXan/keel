@@ -24,7 +24,7 @@ function healthyRepo() {
 test('a healthy project passes every check', () => {
   const l = levels(healthyRepo());
   for (const [id, level] of Object.entries(l)) {
-    if (id !== 'hooks.output-rewriting') assert.equal(level, 'pass', id);
+    if (!['hooks.output-rewriting', 'githooks.installed'].includes(id)) assert.equal(level, 'pass', id);
   }
 });
 

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG_FILE, DEFAULT_CONFIG, validateConfig } from './config.js';
 import { readText, resolveRoot } from './context.js';
 import { isRepo, run } from './git.js';
+import { installGitHooks } from './githooks.js';
 import { keelSettings, mergeSettings } from './settings.js';
 
 const TEMPLATES = fileURLToPath(new URL('../templates/', import.meta.url));
@@ -57,7 +58,7 @@ function fill(text, vars) {
 /**
  * @param {string} root
  * @param {AdoptOptions} [options]
- * @returns {{ written: string[], skipped: string[], merged: string[] }}
+ * @returns {{ written: string[], skipped: string[], merged: string[], notes: string[] }}
  */
 export function adopt(root, options = {}) {
   if (!isRepo(root)) throw new AdoptError('this is not a git repository; run `git init` first');
@@ -88,8 +89,8 @@ export function adopt(root, options = {}) {
     t1MaxFiles: DEFAULT_CONFIG.tiers.t1MaxFiles,
     commands: '- `keel status` — the active change and the next gate\n- `keel doctor` — check the harness\n<!-- Owner: add this project\'s build, lint and test commands. -->',
   };
-  /** @type {{ written: string[], skipped: string[], merged: string[] }} */
-  const out = { written: [], skipped: [], merged: [] };
+  /** @type {{ written: string[], skipped: string[], merged: string[], notes: string[] }} */
+  const out = { written: [], skipped: [], merged: [], notes: [] };
   const put = (/** @type {string} */ rel, /** @type {string} */ content, overwrite = false) => {
     const abs = join(root, rel);
     if (existsSync(abs) && !overwrite) {
@@ -130,6 +131,9 @@ export function adopt(root, options = {}) {
     appendFileSync(join(root, '.gitignore'), `${gitignore && !gitignore.endsWith('\n') ? '\n' : ''}# Keel state (approvals, progress, ledger) stays local\n.keel/state/\n`);
     (gitignore === null ? out.written : out.merged).push('.gitignore');
   }
+  const hooks = installGitHooks(root);
+  out.written.push(...hooks.installed.map((h) => `.git/hooks/${h}`));
+  if (hooks.instructions) out.notes.push(`git hooks: ${hooks.instructions}`);
   return out;
 }
 
@@ -156,7 +160,11 @@ export function adoptCommand(args, io) {
       marketplacePath: option(args, '--marketplace'),
       force: args.includes('--force'),
     });
-    for (const [label, files] of Object.entries(r)) if (files.length > 0) io.stdout.write(`${label}: ${files.join(', ')}\n`);
+    for (const label of ['written', 'skipped', 'merged']) {
+      const files = r[/** @type {'written' | 'skipped' | 'merged'} */ (label)];
+      if (files.length > 0) io.stdout.write(`${label}: ${files.join(', ')}\n`);
+    }
+    for (const note of r.notes) io.stdout.write(`note: ${note}\n`);
     io.stdout.write('keel: adopted. Run `keel doctor`, restart Claude Code to load the hooks and settings, then review and commit the project layer.\n');
     return 0;
   } catch (err) {

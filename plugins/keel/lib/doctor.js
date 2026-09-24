@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { loadConfig } from './config.js';
 import { readText, resolveRoot } from './context.js';
 import { isRepo, run } from './git.js';
+import { gitHooksInstalled } from './githooks.js';
 import { lineCount } from './policy/content.js';
 import { APPROVALS_SANDBOX_PATH, BASH_DENY, STATE_EDIT_DENY } from './settings.js';
 
@@ -75,6 +76,8 @@ export function runDoctor(root, opts = {}) {
   checkSecrets({ '.claude/settings.json': project, '.claude/settings.local.json': local, '~/.claude/settings.json': user }, add);
   const rewriting = JSON.stringify(user.hooks?.PreToolUse ?? []).match(/\brtk\b/);
   add('hooks.output-rewriting', rewriting ? 'warn' : 'pass', rewriting ? 'a user PreToolUse hook rewrites shell output (rtk); Keel runs its own checks, but agent-run evidence may be distorted' : 'no output-rewriting hook detected');
+  const hooked = isRepo(root) && gitHooksInstalled(root);
+  add('githooks.installed', hooked ? 'pass' : 'warn', hooked ? 'git hooks re-check commit and push approvals' : 'Keel git hooks are not installed: commits and pushes made by routes the bash guard cannot see are not re-checked (run keel adopt --force, or add `keel git-hook <hook>` to your hooks)');
   const ignored = run(root, ['check-ignore', '-q', '.keel/state/current.json'], { allowFail: true }) !== null;
   add('gitignore.state', ignored ? 'pass' : 'fail', ignored ? '.keel/state/ is git-ignored' : 'add .keel/state/ to .gitignore');
   if (!opts.quick) checkClaudeVersion(add);
