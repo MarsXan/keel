@@ -6,14 +6,18 @@
  */
 import { commandName } from '../shell-wrappers.js';
 import { deny } from './decision.js';
+import { whichOption } from './git-options.js';
 import { configReads, firstOperand, parseGit } from './git-rules.js';
 
 export const READ_ONLY_ROLES = new Set(['keel:explorer', 'keel:planner', 'keel:verifier', 'keel:reviewer-spec', 'keel:reviewer-standards', 'keel:reviewer-risk', 'keel:auditor']);
 const WRITERS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'srm', 'trash', 'mv', 'cp', 'tee', 'dd', 'truncate', 'touch', 'chmod', 'chown', 'chgrp', 'ln', 'install', 'mkdir', 'patch']);
 const READ_ONLY_GIT = new Set(['status', 'log', 'diff', 'show', 'grep', 'blame', 'ls-files', 'ls-tree', 'rev-parse', 'rev-list', 'describe', 'shortlog', 'cat-file', 'merge-base', 'for-each-ref', 'show-ref', 'name-rev', 'check-ignore', 'version', 'help']);
 const INSTALLS = /^(install|i|add|remove|rm|uninstall|update|up|upgrade|link|unlink|publish|dlx|create|init)$/;
-const BRANCH_WRITES = /^(-[dDmMcCfu]|--(delete|move|copy|force|set-upstream-to|unset-upstream|edit-description|track|no-track|create-reflog)(=|$))/;
-const TAG_WRITES = /^(-[dasfmFu]|--(delete|annotate|sign|force|message|file|local-user)(=|$))/;
+const BRANCH_WRITE_OPTIONS = ['--delete', '--move', '--copy', '--force', '--set-upstream-to', '--unset-upstream', '--edit-description', '--track', '--no-track', '--create-reflog'];
+const TAG_WRITE_OPTIONS = ['--delete', '--annotate', '--sign', '--force', '--message', '--file', '--local-user'];
+const writes = (/** @type {RegExp} */ short, /** @type {string[]} */ long) => (/** @type {string} */ a) => short.test(a) || whichOption(a, long) !== null;
+const BRANCH_WRITES = { test: writes(/^-[dDmMcCfu]/, BRANCH_WRITE_OPTIONS) };
+const TAG_WRITES = { test: writes(/^-[dasfmFu]/, TAG_WRITE_OPTIONS) };
 /** Git subcommands that are read-only in their listing forms only. */
 /** @type {Record<string, (args: string[]) => boolean>} */
 const LISTING = {

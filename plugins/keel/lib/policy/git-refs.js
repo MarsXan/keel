@@ -6,6 +6,7 @@
  */
 import { resolvePath } from '../paths.js';
 import { allowUsing, deny } from './decision.js';
+import { hasOption, whichOption } from './git-options.js';
 
 /**
  * @typedef {import('./decision.js').Decision} Decision
@@ -34,7 +35,8 @@ export function commitRule(args, dyn, ctx) {
     }
     if (a.startsWith('--')) {
       const name = a.split('=')[0];
-      if (['--no-verify', '--all', '--amend', '--include', '--only', '--patch', '--interactive', '--pathspec-from-file'].includes(name)) denied.push(name);
+      const refused = whichOption(a, ['--no-verify', '--all', '--amend', '--include', '--only', '--patch', '--interactive', '--pathspec-from-file']);
+      if (refused) denied.push(refused);
       if (name === '--dry-run') dryRun = true;
       if (!a.includes('=') && COMMIT_ARG_LONG.has(name)) i++; // the value (a message may be computed)
       continue;
@@ -65,6 +67,9 @@ export function commitRule(args, dyn, ctx) {
   return deny('Committing needs the owner\'s approval of exactly what is staged. Stage the changes, show the owner `git diff --cached --stat`, ask them to type /keel:approve commit, then run the same commit. Changing the staged content afterwards voids the approval.');
 }
 
+/** Push options that force, delete, publish tags or mirrors, reach another remote, or skip hooks. */
+const PUSH_REFUSED = ['--force', '--force-with-lease', '--force-if-includes', '--mirror', '--delete', '--prune', '--all', '--branches', '--tags', '--follow-tags', '--no-verify', '--receive-pack', '--exec', '--repo'];
+
 /**
  * @param {string[]} args
  * @param {boolean[]} dyn
@@ -77,10 +82,11 @@ export function pushRule(args, dyn, ctx) {
     const a = args[i];
     if (dyn[i]) return deny('Part of this push is computed at run time; spell out the remote and branch.');
     if (a === '-n' || a === '--dry-run') return null;
-    if (/^(-f|--force|--force-with-lease(=.*)?|--force-if-includes|--mirror|-d|--delete|--prune|--all|--branches|--tags|--follow-tags|--no-verify|--receive-pack(=.*)?|--exec(=.*)?)$/.test(a)) {
-      return deny(`git push ${a} is not allowed: no force, deletes, tags, mirrors or hook bypasses. Push one feature branch normally.`);
+    const refused = /^-(f|d)$/.test(a) ? a : whichOption(a, PUSH_REFUSED);
+    if (refused) {
+      return deny(`git push ${refused} is not allowed: no force, deletes, tags, mirrors, other remotes or hook bypasses. Push one feature branch normally.`);
     }
-    if (a === '-o' || a === '--push-option' || a === '--repo') {
+    if (a === '-o' || a === '--push-option') {
       i++;
       continue;
     }
@@ -128,7 +134,7 @@ function pushTarget(refspec, branch) {
  * @param {(ctx: CommandContext, abs: string) => boolean} guarded
  */
 export function resetRule(args, cwd, ctx, guarded) {
-  if (args.some((a) => /^--(hard|merge|keep|soft)$/.test(a))) {
+  if (hasOption(args, ['--hard', '--merge', '--keep', '--soft'])) {
     return deny('git reset --hard/--soft/--merge/--keep moves the branch or discards work; that is the owner\'s call.');
   }
   const dash = args.indexOf('--');
@@ -147,10 +153,10 @@ export function resetRule(args, cwd, ctx, guarded) {
  * @param {(ctx: CommandContext, abs: string) => boolean} guarded
  */
 export function checkoutRule(sub, args, cwd, ctx, guarded) {
-  if (args.some((a) => /^--orphan(=|$)/.test(a))) {
+  if (hasOption(args, ['--orphan'])) {
     return deny(`git ${sub} --orphan starts a history without the project's commits, which hides every change from the audit; branch from the base branch instead.`);
   }
-  if (args.some((a) => /^(-f|--force|--discard-changes|--overwrite-ignore|-B|-C|--force-create)$/.test(a))) {
+  if (args.some((a) => /^-(f|B|C)$/.test(a)) || hasOption(args, ['--force', '--discard-changes', '--overwrite-ignore', '--force-create'])) {
     return deny(`git ${sub} with a forcing option discards work or resets a branch; commit or move the work aside, or create a new branch.`);
   }
   const dash = args.indexOf('--');

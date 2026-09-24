@@ -5,10 +5,11 @@
  * approval bound to the staged diff, pushes a one-time token; history rewriting, hook
  * bypasses, configuration changes, merges and tags are the owner's alone.
  */
-import { resolvePath } from '../paths.js';
-import { guardedWrite } from './command-rules.js';
+import { realPath, resolvePath } from '../paths.js';
+import { guardedWrite, pathGate } from './command-rules.js';
 import { deny } from './decision.js';
 import { checkoutRule, commitRule, fetchRule, pushRule, resetRule } from './git-refs.js';
+import { hasOption, isOption, whichOption } from './git-options.js';
 
 /**
  * @typedef {import('../shell.js').SimpleCommand} SimpleCommand
@@ -73,7 +74,7 @@ export function configReads(args) {
   const i = operandIndex(args, CONFIG_VALUE_OPTIONS);
   const leading = i < 0 ? args : args.slice(0, i);
   const operands = i < 0 ? [] : args.slice(i);
-  if (leading.some((a) => /^(--add|--unset(-all)?|--replace-all|--rename-section|--remove-section|--edit|-e)$/.test(a))) return false;
+  if (leading.some((a) => a === '-e' || whichOption(a, ['--add', '--unset', '--unset-all', '--replace-all', '--rename-section', '--remove-section', '--edit']))) return false;
   if (operands[0] === 'get' || operands[0] === 'list') return true;
   if (['set', 'unset', 'rename-section', 'remove-section', 'edit'].includes(operands[0] ?? '')) return false;
   if (leading.some((a) => /^(--get(-all|-regexp|-urlmatch|-color|-colorbool)?|--list|-l)$/.test(a))) return true;
@@ -142,8 +143,9 @@ export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
   }
   const sub = g.sub;
   const outputs = args.flatMap((a, i) => {
-    if (a === '--output' || (a === '-o' && ['archive', 'format-patch'].includes(sub))) return [args[i + 1] ?? ''];
-    return a.startsWith('--output=') ? [a.slice(9)] : [];
+    if (a === '-o' && ['archive', 'format-patch'].includes(sub)) return [args[i + 1] ?? ''];
+    if (!isOption(a, '--output')) return [];
+    return a.includes('=') ? [a.slice(a.indexOf('=') + 1)] : [args[i + 1] ?? ''];
   });
   const written = outputs.length > 0 ? guardedWrite(outputs, { ...ctx, cwd }, `git ${sub} --output`) : null;
   if (written) return written;
@@ -185,9 +187,9 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
     case 'fetch':
       return fetchRule(args, ctx);
     case 'branch':
-      if (has(/^(-D|-f|--force|-M|-C)$/) || has(/^-[a-zA-Z]*[DfMC]/)) return deny('Force-deleting, force-moving or overwriting branches is not allowed.');
-      if (has(/^(-u|--set-upstream-to(=.*)?|--unset-upstream|--edit-description)$/)) return deny('Changing branch configuration (upstream, description) is not allowed.');
-      if (has(/^(-d|--delete|-m|--move)$/) && args.some((a) => ctx.config.project.protectedBranches.includes(a))) {
+      if (has(/^-[a-zA-Z]*[DfMC]/) || hasOption(args, ['--force'])) return deny('Force-deleting, force-moving or overwriting branches is not allowed.');
+      if (has(/^-u$/) || hasOption(args, ['--set-upstream-to', '--unset-upstream', '--edit-description', '--track', '--no-track'])) return deny('Changing branch configuration (upstream, description) is not allowed.');
+      if ((has(/^-[dm]$/) || hasOption(args, ['--delete', '--move', '--copy'])) && args.some((a) => ctx.config.project.protectedBranches.includes(a))) {
         return deny('Protected branches cannot be deleted or renamed.');
       }
       return null;
@@ -196,10 +198,8 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
     case 'restore':
       return checkoutRule(sub, args, cwd, ctx, touchesGuarded);
     case 'rm':
-    case 'mv': {
-      const hit = args.filter((a) => !a.startsWith('-')).find((a) => touchesGuarded(ctx, resolvePath(cwd, a, ctx.home)));
-      return hit ? deny(`git ${sub} ${hit} touches a protected Keel path; guardrail files change only through /keel:amend.`) : null;
-    }
+    case 'mv':
+      return movedPaths(sub, args, cwd, ctx);
     case 'update-index':
       return args.every((a) => ['--refresh', '--really-refresh', '-q', '--ignore-missing', '--unmerged'].includes(a))
         ? null
@@ -209,9 +209,9 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
       return verb && !['show', 'get-url'].includes(verb) ? deny(`git remote ${verb} changes the repository configuration; that is the owner's call.`) : null;
     }
     case 'worktree':
-      return args[0] === 'remove' && has(/^(-f|--force)$/) ? deny('Force-removing a worktree discards its uncommitted work.') : null;
+      return args[0] === 'remove' && (has(/^-f$/) || hasOption(args, ['--force'])) ? deny('Force-removing a worktree discards its uncommitted work.') : null;
     case 'gc':
-      return has(/^--prune=(now|all)$/) ? deny('Pruning unreachable objects immediately destroys recovery points.') : null;
+      return args.some((a) => isOption(a, '--prune') && /=(now|all)$/.test(a)) ? deny('Pruning unreachable objects immediately destroys recovery points.') : null;
     case 'reflog':
       return ['expire', 'delete'].includes(args[0]) ? deny('Expiring or deleting reflog entries destroys recovery points.') : null;
     case 'notes':
@@ -227,6 +227,35 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
       if (HISTORY_REWRITE.has(sub)) return deny(`git ${sub} rewrites refs, the index or history directly; that is not allowed.`);
       return null;
   }
+}
+
+/**
+ * `git rm` and `git mv` delete or move whole directories: every file git keeps under each
+ * path meets the same protection and edit gates as a shell delete.
+ * @param {string} sub
+ * @param {string[]} args
+ * @param {string} cwd
+ * @param {CommandContext} ctx
+ * @returns {Decision | null}
+ */
+function movedPaths(sub, args, cwd, ctx) {
+  /** @type {Decision | null} */
+  let asked = null;
+  for (const a of args.filter((x) => !x.startsWith('-'))) {
+    const abs = resolvePath(cwd, a, ctx.home);
+    if (touchesGuarded(ctx, abs)) return deny(`git ${sub} ${a} touches a protected Keel path; guardrail files change only through /keel:amend.`);
+    const rel = ctx.classify.rel(realPath(abs));
+    if (rel === null || rel === '') continue;
+    const files = ctx.filesUnder ? ctx.filesUnder(rel) : [rel];
+    const guarded = files.find((f) => ctx.classify.isProtected(f));
+    if (guarded) return deny(`git ${sub} ${a} would take ${guarded}, a protected guardrail file, with it; it changes only through /keel:amend.`);
+    for (const f of files.length > 0 ? files : [rel]) {
+      const d = pathGate(f, ctx, `git ${sub} ${a} would change ${f}`);
+      if (d?.decision === 'deny') return d;
+      asked ??= d;
+    }
+  }
+  return asked;
 }
 
 /**

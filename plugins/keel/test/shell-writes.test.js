@@ -71,3 +71,9 @@ test('a recursive delete may not take a protected file with it', async () => {
   const dir = repo({ 'e2e/playwright.config.ts': 'export default {};\n', 'tools/lint/eslint.config.mjs': 'export default [];\n' });
   for (const command of ['rm -rf e2e', 'rm -r tools']) assert.match((await bash(dir, command)).stderr, /protected guardrail file/, command);
 });
+
+test('git rm -r and git mv of a directory meet the same checks as rm', async () => {
+  const dir = repo({ 'e2e/playwright.config.ts': 'export default {};\n', 'tools/lint/eslint.config.mjs': 'export default [];\n' });
+  for (const command of ['git rm -r -q e2e', 'git mv tools tools2']) assert.match((await bash(dir, command)).stderr, /protected guardrail file/, command);
+  assert.match((await bash(dir, 'git rm -r -q src/a')).stderr, /no active change/, 'source under the directory needs a plan');
+});

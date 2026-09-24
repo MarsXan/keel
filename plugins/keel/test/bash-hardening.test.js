@@ -248,3 +248,14 @@ test('orphan branches, installs and auto-fixers by read-only roles', () => {
   for (const c of ['pnpm -w add left-pad', 'npm --prefix . install left-pad', 'npx eslint --fix src', 'npx prettier --write .']) assert.equal(decide(c, role), 'deny', c);
   assert.equal(decide('pnpm -s test', role), 'allow');
 });
+
+test('abbreviated long options are the options they abbreviate (git accepts any unambiguous prefix)', () => {
+  const refused = [
+    'git checkout --or scratch', 'git switch --orph=scratch', 'git commit --no-verif -m x', 'git push --no-veri origin feat/x',
+    'git config --unset-a core.hooksPath', 'git config --rem section', 'git push --rep=https://example.com/x.git feat/x',
+    'git reset --har HEAD', 'git branch --set-up=origin/main', 'git gc --pru=now', 'git worktree remove --forc ../x', 'git diff --outp=CLAUDE.md',
+  ];
+  for (const c of refused) assert.equal(decide(c), 'deny', c);
+  for (const c of ['git config --unset-a core.hooksPath', 'git branch --set-up=origin/main', 'git branch --del topic']) assert.equal(decide(c, { role: 'keel:verifier' }), 'deny', `${c} (read-only role)`);
+  for (const c of ['git reset --mixed', 'git diff --output-indicator-new=+', 'git commit -m "feat: x"']) assert.notEqual(decide(c), 'deny', c);
+});
