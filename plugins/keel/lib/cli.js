@@ -31,6 +31,7 @@ const COMMANDS = {
   guard: () => import('./guards.js').then((m) => m.guardCommand),
   status: () => import('./status.js').then((m) => m.statusCommand),
   use: () => import('./use.js').then((m) => m.useCommand),
+  doctor: () => import('./doctor.js').then((m) => m.doctorCommand),
 };
 
 /** @returns {Io} */

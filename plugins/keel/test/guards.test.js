@@ -189,3 +189,14 @@ test('hooks.json wires every event to the keel CLI in exec form', () => {
     }
   }
 });
+
+test('Read and Grep may not open secret files', async () => {
+  const dir = adoptedRepo();
+  const read = (file_path) => guard(dir, 'read', { tool_name: 'Read', tool_input: { file_path } });
+  assert.equal((await read(join(dir, '.env'))).code, 2);
+  assert.equal((await read(join(dir, 'apps/api/.env.local'))).code, 2);
+  assert.equal((await read(join(dir, '.env.example'))).code, 0);
+  assert.equal((await read(join(dir, 'README.md'))).code, 0);
+  assert.equal((await guard(dir, 'read', { tool_name: 'Grep', tool_input: { pattern: 'KEY', path: join(dir, '.env') } })).code, 2);
+  assert.equal((await guard(dir, 'read', { tool_name: 'Grep', tool_input: { pattern: 'KEY' } })).code, 0);
+});

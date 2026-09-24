@@ -89,6 +89,19 @@ function promptSubmittingToolGuard(input) {
   return { code: 0 };
 }
 
+/**
+ * Read and Grep may not open secret files. Permission rules cannot carve `.env.example`
+ * out of a `.env.*` deny, so the configured secret patterns are enforced here.
+ * @type {Guard}
+ */
+function readGuard(input, ctx) {
+  const target = input.tool_input?.file_path ?? input.tool_input?.path;
+  if (typeof target !== 'string' || !target) return { code: 0 };
+  const abs = resolve(ctx.root, target.replace(/^~(?=\/|$)/, ctx.home));
+  if (!classifier(ctx.root, ctx.config, ctx.home).isSecret(abs)) return { code: 0 };
+  return { code: 2, stderr: `${target} is a secret file; Keel keeps secrets out of the agent's reach. Ask the owner for any value you need, or read the .example file.\n` };
+}
+
 /** Fast checks on the file just edited, fed back as context. @type {Guard} */
 function postEditGuard(input, ctx) {
   const file = input.tool_input?.file_path;
@@ -107,5 +120,6 @@ export const toolGuards = {
   bash: bashGuard,
   edit: editGuard,
   tool: promptSubmittingToolGuard,
+  read: readGuard,
   'post-edit': postEditGuard,
 };

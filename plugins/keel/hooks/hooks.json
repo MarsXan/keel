@@ -4,63 +4,210 @@
     "SessionStart": [
       {
         "matcher": "startup|resume|clear|compact",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "session-start"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "session-start"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "prompt"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "prompt"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "bash"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "bash"
+            ],
+            "timeout": 30
+          }
+        ]
       },
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "edit"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "edit"
+            ],
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "read"
+            ],
+            "timeout": 30
+          }
+        ]
       },
       {
         "matcher": "CronCreate|ScheduleWakeup|RemoteTrigger|SendMessage|Workflow|mcp__.*",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "tool"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "tool"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "post-edit"], "timeout": 120 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "post-edit"
+            ],
+            "timeout": 120
+          }
+        ]
       }
     ],
     "Stop": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "stop"], "timeout": 600 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "stop"
+            ],
+            "timeout": 600
+          }
+        ]
       }
     ],
     "SubagentStop": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "subagent-stop"], "timeout": 600 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "subagent-stop"
+            ],
+            "timeout": 600
+          }
+        ]
       }
     ],
     "SubagentStart": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "subagent-start"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "subagent-start"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "PreCompact": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "pre-compact"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "pre-compact"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "ConfigChange": [
       {
         "matcher": "project_settings|local_settings|skills",
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "config-change"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "config-change"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ],
     "SessionEnd": [
       {
-        "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/bin/keel", "guard", "session-end"], "timeout": 30 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/bin/keel",
+              "guard",
+              "session-end"
+            ],
+            "timeout": 30
+          }
+        ]
       }
     ]
   }

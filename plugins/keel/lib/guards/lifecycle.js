@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { VERSION } from '../cli.js';
 import { section, tasks } from '../changefile.js';
 import { approvalQueries, readText } from '../context.js';
+import { runDoctor } from '../doctor.js';
 import { changedFiles, isRepo, worktreeFingerprint } from '../git.js';
 import { block, clip, context } from '../io.js';
 import { amendApproved } from '../policy/authority.js';
@@ -37,7 +38,8 @@ export function redLines(ctx) {
 /** @type {Guard} */
 function sessionStart(_input, ctx) {
   const lines = [`Keel ${VERSION} guards this project. Every rule below is enforced by a check, not by trust.`, statusText(ctx)];
-  if (!isRepo(ctx.root)) lines.push('WARNING: this is not a git repository; the end-of-turn audit cannot run.');
+  const failing = runDoctor(ctx.root, { quick: true, home: ctx.home }).results.filter((r) => r.level === 'fail');
+  if (failing.length > 0) lines.push('keel doctor found problems (tell the owner):', ...failing.slice(0, 5).map((r) => `- ${r.id}: ${r.message}`));
   const rules = redLines(ctx);
   if (rules.length > 0) lines.push('Red lines:', ...rules.slice(0, 10));
   lines.push('If a rule blocks you and you cannot comply, reply with a line starting "ESCALATE:" instead of working around it.');

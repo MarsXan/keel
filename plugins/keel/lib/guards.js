@@ -25,7 +25,7 @@ const GUARDS = {
   'subagent-stop': stopGuard,
 };
 
-export const GATING = new Set(['bash', 'edit', 'tool', 'stop', 'subagent-stop', 'config-change']);
+export const GATING = new Set(['bash', 'edit', 'tool', 'read', 'stop', 'subagent-stop', 'config-change']);
 
 /**
  * Runs one guard. Projects that never adopted Keel are left alone.
