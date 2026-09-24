@@ -16,6 +16,7 @@ commands:
   lint-change [file]   lint a change file (default: the active change) [--stage spec|plan|verify]
   check [--stage s]    run the configured checks on changed files (stage: stop | ci)
   diff-audit           audit the working tree against HEAD
+  ci [--base ref]      the server-side gate for a branch
   --version            print the version`;
 
 /**
@@ -41,6 +42,7 @@ const COMMANDS = {
   check: () => import('./check.js').then((m) => m.checkCommand),
   'git-hook': () => import('./githooks.js').then((m) => m.gitHookCommand),
   'lint-change': () => import('./lint.js').then((m) => m.lintCommand),
+  ci: () => import('./ci.js').then((m) => m.ciCommand),
   'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
 };
 
