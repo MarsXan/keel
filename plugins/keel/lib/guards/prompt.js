@@ -14,6 +14,7 @@ import { currentBranch, stagedDiff } from '../git.js';
 import { sha256, shortHash } from '../hash.js';
 import { context } from '../io.js';
 import { lintChange } from '../lint.js';
+import { appendLedger } from '../state.js';
 import { reminder } from '../status.js';
 
 /**
@@ -64,6 +65,7 @@ function approve(what, arg, prompt, ctx) {
   const hash = artifactHash(what, arg, ctx);
   if (typeof hash !== 'string') return fail(hash.error);
   const record = recordApproval(ctx.root, { change: ch?.id ?? null, what, hash, arg, prompt: prompt.split('\n')[0] });
+  appendLedger(ctx.root, ch?.id ?? null, `owner approved ${what}${arg ? ` ${arg}` : ''} (${shortHash(hash)})`);
   if (ch) {
     const line = `${record.ts} ${what}${arg ? ` ${arg}` : ''} approved ${shortHash(hash)} (owner prompt)`;
     writeFileSync(join(ctx.root, ch.rel), appendApproval(ch.text, line));

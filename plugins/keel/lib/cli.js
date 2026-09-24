@@ -10,6 +10,7 @@ commands:
   status               active change, tier, approvals and the next gate
   use <change-id>      make docs/changes/<change-id>.md the active change
   task <T-n> <stage>   move a task through red → green → refactor → done
+  ledger [--tail n]    the active change's log: approvals, stages, escalations, handoffs
   doctor [--quick]     audit configuration, settings, permissions and the constitution
   adopt [options]      write the Keel project layer into this repository
   lint-change [file]   lint a change file (default: the active change) [--stage spec|plan|verify]
@@ -34,6 +35,7 @@ const COMMANDS = {
   status: () => import('./status.js').then((m) => m.statusCommand),
   use: () => import('./use.js').then((m) => m.useCommand),
   task: () => import('./tasks.js').then((m) => m.taskCommand),
+  ledger: () => import('./ledger.js').then((m) => m.ledgerCommand),
   doctor: () => import('./doctor.js').then((m) => m.doctorCommand),
   adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
   check: () => import('./check.js').then((m) => m.checkCommand),

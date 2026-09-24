@@ -8,6 +8,7 @@ import { approvalQueries, readText } from '../context.js';
 import { runDoctor } from '../doctor.js';
 import { changedFiles, isRepo, worktreeFingerprint } from '../git.js';
 import { block, clip, context } from '../io.js';
+import { readLedger } from '../ledger.js';
 import { amendApproved } from '../policy/authority.js';
 import { appendLedger, updateCurrent } from '../state.js';
 import { statusText } from '../status.js';
@@ -44,8 +45,10 @@ function sessionStart(_input, ctx) {
   if (failing.length > 0) lines.push('keel doctor found problems (tell the owner):', ...failing.slice(0, 5).map((r) => `- ${r.id}: ${r.message}`));
   const rules = redLines(ctx);
   if (rules.length > 0) lines.push('Red lines:', ...rules.slice(0, 10));
+  const recent = ctx.change ? readLedger(ctx.root, ctx.change.id, 8) : [];
+  if (recent.length > 0) lines.push(`Recent ledger for ${ctx.change?.id} (handoff):`, ...recent);
   lines.push('If a rule blocks you and you cannot comply, reply with a line starting "ESCALATE:" instead of working around it.');
-  return { code: 0, stdout: context('SessionStart', clip(lines.join('\n'), 4000)) };
+  return { code: 0, stdout: context('SessionStart', clip(lines.join('\n'), 5000)) };
 }
 
 /** @type {Guard} */
