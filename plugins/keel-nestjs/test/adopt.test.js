@@ -1,7 +1,7 @@
 // keel-nestjs adopt on a project that adopted Keel: files installed, configuration merged
 // so it only tightens, scripts added, drift recorded, and a second run changes nothing.
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { runDoctor } from '../../keel/lib/doctor.js';
@@ -30,11 +30,12 @@ test('installs the checker configs and rules, merges the configuration, records 
   const config = json(dir, '.keel/config.json');
   assert.ok(config.paths.source.includes('libs/**'));
   assert.ok(config.paths.heavy.includes('**/migrations/**'));
-  assert.deepEqual(config.checks.map((c) => c.id), ['typecheck', 'lint', 'lint-all', 'arch', 'test']);
+  assert.deepEqual(config.checks.map((c) => c.id), ['typecheck', 'lint', 'lint-all', 'arch', 'test', 'coverage']);
   assert.equal(config.caps.fileLinesByPath['libs/*/src/domain/**'], 200);
   const pkg = json(dir, 'package.json');
   assert.equal(pkg.scripts.test, 'vitest run --reporter=dot', 'an existing script is kept');
   assert.equal(pkg.scripts.arch, 'depcruise apps libs --config .dependency-cruiser.cjs');
+  assert.equal(pkg.packageManager, 'pnpm@10.11.0', 'CI installs pnpm from packageManager');
   assert.match(r.stdout, /already has a "test" script \(kept\)/);
   assert.match(r.stdout, /pnpm add -D -w [\s\S]*typescript@6\.0\.3/);
   assert.match(readFileSync(join(dir, '.gitignore'), 'utf8'), /\*\*\/__canary__\*/);
@@ -58,4 +59,12 @@ test('merging only tightens', () => {
   assert.deepEqual(merged.paths.heavy, ['db/**', '**/migrations/**']);
   assert.equal(merged.caps.fileLinesByPath['libs/*/src/domain/**'], 150);
   assert.deepEqual(merged.checks.map((c) => c.run), ['make test', 'x']);
+  assert.deepEqual(merged.checks[0].stages, ['ci', 'stop'], "the project's command runs wherever the pack's would");
+});
+
+test('the architecture script names only the planting roots the project has', async () => {
+  const dir = await keelProject();
+  mkdirSync(join(dir, 'libs'));
+  assert.equal((await runPack(['adopt'], { cwd: dir })).code, 0);
+  assert.equal(json(dir, 'package.json').scripts.arch, 'depcruise libs --config .dependency-cruiser.cjs');
 });

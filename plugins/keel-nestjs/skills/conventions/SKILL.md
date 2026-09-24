@@ -25,7 +25,8 @@ libs/contracts/             shared types and Zod schemas: events and DTOs
 |---|---|---|
 | domain, kernel | own domain, kernel — no framework | `domain-no-outer-layers`, `domain-no-other-contexts`, `domain-no-framework` |
 | application | own domain and application, kernel, contracts, other contexts' public index | `application-no-outer-layers`, `no-cross-context-internals` |
-| infrastructure, interface | inner layers of the same context, kernel, contracts | `no-cross-context-internals` |
+| infrastructure | own domain and application, kernel, contracts — never interface | `infrastructure-no-interface` |
+| interface | own application and domain, kernel, contracts — never infrastructure | `interface-no-infrastructure` |
 | apps | libraries' public index only | `apps-only-public-api` |
 | production code | no dev dependencies, no cycles, only resolvable imports | `not-to-dev-dep`, `no-circular`, `not-to-unresolvable` |
 
@@ -48,13 +49,15 @@ File 300 lines (domain 200), function 50, complexity 10, parameters 6; no `any`,
 `@ts-ignore`; every disable says why, and protected rules cannot be disabled at all.
 
 ## Tests (Vitest)
-Test first; every test asserts; `.only`, `.skip` and empty test files fail; fakes that
+Test first; `*.test.ts` and `*.spec.ts` both run; every test asserts; `.only`, `.skip` and
+empty test files fail; coverage thresholds per layer run in CI (`pnpm -s coverage`); fakes that
 honour the port's contract over mocks; a module test compiles each context's module with the
 real container.
 
 ## Heavy paths (T2)
-Migrations and schema, `libs/contracts`, `libs/kernel`, ports (`*.port.ts`), any
-`package.json` of a lib or app, `tsconfig.base.json`, `pnpm-workspace.yaml`.
+Migrations and schema, `libs/contracts`, `libs/kernel`, ports (`*.port.ts`),
+`tsconfig.base.json`, `pnpm-workspace.yaml`. A new bounded context is T2 work as well
+(`/keel-nestjs:new-context`).
 
 The path-scoped rules in `.claude/rules/` repeat the part that applies to the file at hand.
 `keel-nestjs canaries` proves every rule above still fires.

@@ -22,16 +22,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check out the Keel CLI
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.KEEL_REPOSITORY }}
-          ref: ${{ vars.KEEL_REF || 'main' }}
-          token: ${{ secrets.KEEL_TOKEN || github.token }}
-          path: .keel-cli
+      - name: Fetch the Keel CLI (outside the workspace)
+        env:
+          KEEL_REPOSITORY: ${{ vars.KEEL_REPOSITORY }}
+          KEEL_REF: ${{ vars.KEEL_REF || 'main' }}
+          KEEL_TOKEN: ${{ secrets.KEEL_TOKEN || github.token }}
+        run: git clone --quiet --depth 1 --branch "$KEEL_REF" "https://x-access-token:${KEEL_TOKEN}@github.com/${KEEL_REPOSITORY}.git" "$RUNNER_TEMP/keel-cli"
       - name: keel audit
         run: |
-          node .keel-cli/plugins/keel/bin/keel audit --metrics > keel-audit.md
+          node "$RUNNER_TEMP/keel-cli/plugins/keel/bin/keel" audit --metrics > keel-audit.md
           cat keel-audit.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

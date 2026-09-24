@@ -10,7 +10,7 @@ Tests are the specification. Keel freezes them when their task turns green.
 - **Write the failing test first** (the red stage), watch it fail for the right reason, then
   make it pass.
 - **Every test asserts:** a test without an assertion fails (`requireAssertions`,
-  `vitest/expect-expect`).
+  `vitest/expect-expect`). Both `*.test.ts` and `*.spec.ts` run.
 - **Never focus or skip:** `.only` and `.skip` fail the run and the lint
   (`allowOnly: false`, `vitest/no-focused-tests`, `vitest/no-disabled-tests`).
 - **Test behaviour through the public surface** of the unit: a handler through `execute`, an

@@ -30,6 +30,20 @@ module.exports = {
       to: { path: '^libs/$1/src/', pathNot: '^libs/$1/src/(domain|application)/' },
     },
     {
+      name: 'infrastructure-no-interface',
+      comment: 'Adapters do not reach transports; the module wires them together.',
+      severity: 'error',
+      from: { path: '^libs/([^/]+)/src/infrastructure/', pathNot: TESTS },
+      to: { path: '^libs/$1/src/interface/' },
+    },
+    {
+      name: 'interface-no-infrastructure',
+      comment: 'Transports call application handlers, never adapters directly.',
+      severity: 'error',
+      from: { path: '^libs/([^/]+)/src/interface/', pathNot: TESTS },
+      to: { path: '^libs/$1/src/infrastructure/' },
+    },
+    {
       name: 'domain-no-other-contexts',
       comment: 'A domain knows no other bounded context; only the shared kernel.',
       severity: 'error',

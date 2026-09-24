@@ -12,9 +12,10 @@ The domain is plain TypeScript: the business rules and nothing else.
   `boundaries/dependencies`.
 - **No outer layers, no other contexts.** Import only this context's domain and
   `libs/kernel` (`domain-no-outer-layers`, `domain-no-other-contexts`).
-- **No hidden inputs.** Never `Date.now()`, `new Date()`, `Math.random()` or timers: take a
-  `Clock` (from the kernel) or a random source as a parameter or through a port
-  (`no-restricted-syntax`, `no-restricted-globals`).
+- **No hidden inputs.** Never `Date.now()`, `new Date()`, `Math.random()` or timers — not
+  through `globalThis`, not by importing `node:timers`: take a `Clock` (from the kernel) or a
+  random source as a parameter or through a port (`no-restricted-syntax`,
+  `no-restricted-globals`, `no-restricted-imports`).
 - **No inline ESLint comments** at all here (`noInlineConfig`,
   `@eslint-community/eslint-comments/no-use`). If a rule gets in the way, the design is
   wrong or the rule needs an amendment.

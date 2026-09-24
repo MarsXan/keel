@@ -12,16 +12,24 @@ import { fileURLToPath } from 'node:url';
 
 export const MARK = '__canary__';
 
+/** Where canaries plant, and so the only folders a sweep touches. */
+export const ROOTS = ['apps', 'libs'];
+
 /**
  * How each checker runs from the project root (`files` are the planted paths), and the
  * configuration file that must exist for it to apply.
- * @type {Record<string, { tool: string, config: string, args: (files: string[]) => string[] }>}
+ * @type {Record<string, { tool: string, config: string, args: (files: string[], project: string) => string[] }>}
  */
 export const CHECKERS = {
-  arch: { tool: 'depcruise', config: '.dependency-cruiser.cjs', args: (files) => ['--config', '.dependency-cruiser.cjs', '--output-type', 'err', ...(files.length > 0 ? files : ['apps', 'libs'])] },
+  arch: {
+    tool: 'depcruise',
+    config: '.dependency-cruiser.cjs',
+    args: (files, project) => ['--config', '.dependency-cruiser.cjs', '--output-type', 'err', ...(files.length > 0 ? files : ROOTS.filter((d) => existsSync(join(project, d))))],
+  },
   lint: { tool: 'eslint', config: 'eslint.config.mjs', args: (files) => ['--format', 'json', '--max-warnings', '0', ...(files.length > 0 ? files : ['.'])] },
   types: { tool: 'tsc', config: 'tsconfig.json', args: () => ['-p', 'tsconfig.json', '--pretty', 'false'] },
   test: { tool: 'vitest', config: 'vitest.config.ts', args: (files) => ['run', ...files] },
+  coverage: { tool: 'vitest', config: 'vitest.config.ts', args: () => ['run', '--coverage', '--coverage.reporter=text-summary'] },
 };
 
 /**
@@ -139,7 +147,7 @@ export function loadCanaries(dir) {
 }
 
 /**
- * Removes planted files left anywhere in the project outside node_modules.
+ * Removes planted files left in the folders canaries plant into (apps/ and libs/).
  * @param {string} project
  * @returns {string[]} the project-relative paths removed
  */
@@ -158,7 +166,7 @@ export function sweep(project) {
       }
     }
   };
-  visit(project);
+  for (const root of ROOTS) if (existsSync(join(project, root))) visit(join(project, root));
   return removed;
 }
 
@@ -173,7 +181,10 @@ export function runChecker(project, checker, files = []) {
   const { tool, args } = CHECKERS[checker];
   const bin = join(project, 'node_modules', '.bin', tool);
   if (!existsSync(bin)) return { ok: false, code: null, output: `${tool} is not installed in ${project} (run pnpm install there)` };
-  const r = spawnSync(bin, args(files), { cwd: project, encoding: 'utf8', env: { ...process.env, NODE_TEST_CONTEXT: undefined, FORCE_COLOR: '0', NO_COLOR: '1' }, timeout: 180_000 });
+  // Without CI in the environment: Vitest derives allowOnly from it, and a canary must prove
+  // the project's configuration, not a default.
+  const env = { ...process.env, CI: undefined, NODE_TEST_CONTEXT: undefined, FORCE_COLOR: '0', NO_COLOR: '1' };
+  const r = spawnSync(bin, args(files, project), { cwd: project, encoding: 'utf8', env, timeout: 300_000 });
   const output = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`;
   return { ok: r.status === 0, code: r.status, output };
 }
@@ -236,6 +247,7 @@ export const PACK_CANARIES = fileURLToPath(new URL('../canaries', import.meta.ur
 export function canariesCommand(args, io) {
   const at = args.indexOf('--project');
   const project = resolve(io.cwd, at >= 0 && args[at + 1] ? args[at + 1] : '.');
+  const canaries = loadCanaries(PACK_CANARIES);
   const left = sweep(project);
   if (left.length > 0) io.stdout.write(`removed planted files left by an earlier run: ${left.join(', ')}\n`);
   let failed = 0;
@@ -253,7 +265,7 @@ export function canariesCommand(args, io) {
   const counts = { caught: 0, missed: 0, skipped: 0 };
   /** @type {string[]} */
   const lines = [];
-  for (const canary of loadCanaries(PACK_CANARIES)) {
+  for (const canary of canaries) {
     if (!existsSync(join(project, CHECKERS[canary.checker].config))) {
       counts.skipped++;
       continue;
@@ -269,7 +281,8 @@ export function canariesCommand(args, io) {
     }
   }
   io.stdout.write(`canaries: ${counts.caught} caught, ${counts.missed} missed, ${counts.skipped} skipped\n${lines.map((l) => `${l}\n`).join('')}`);
-  const ok = failed === 0 && counts.missed === 0;
+  if (counts.caught === 0) io.stdout.write('no canary could be planted: the project needs libs/<context>/src/domain, apps/<app> and the checker configurations.\n');
+  const ok = failed === 0 && counts.missed === 0 && counts.caught > 0;
   io.stdout.write(`keel-nestjs canaries: ${ok ? 'PASS' : 'FAIL'}\n`);
   return ok ? 0 : 1;
 }

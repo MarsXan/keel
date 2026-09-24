@@ -16,14 +16,14 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['apps/**/*.test.ts', 'libs/**/*.test.ts'],
+    include: ['apps/**/*.{test,spec}.ts', 'libs/**/*.{test,spec}.ts'],
     allowOnly: false,
     passWithNoTests: false,
     expect: { requireAssertions: true },
     coverage: {
       provider: 'v8',
       include: ['apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'],
-      exclude: ['**/*.test.ts', '**/index.ts', '**/main.ts'],
+      exclude: ['**/*.{test,spec}.ts', '**/index.ts', '**/main.ts'],
       thresholds: {
         'libs/*/src/domain/**': layer(90),
         'libs/*/src/application/**': layer(80),

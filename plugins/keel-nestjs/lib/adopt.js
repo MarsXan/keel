@@ -60,7 +60,7 @@ export function packFiles() {
 
 /**
  * Merges the pack's configuration fragment: lists only gain entries, per-path caps only
- * tighten, and a check is added only when no check has its id.
+ * tighten, and a check with a pack check's id keeps its command but gains the pack's stages.
  * @param {Json} config the project's .keel/config.json
  * @param {Json} fragment
  * @returns {Json}
@@ -79,8 +79,12 @@ export function mergeConfig(config, fragment) {
     out.caps.fileLinesByPath[glob] = typeof current === 'number' ? Math.min(current, lines) : lines;
   }
   out.checks ??= [];
-  const ids = new Set(out.checks.map((/** @type {Json} */ c) => c.id));
-  for (const check of fragment.checks ?? []) if (!ids.has(check.id)) out.checks.push(check);
+  for (const check of fragment.checks ?? []) {
+    const existing = out.checks.find((/** @type {Json} */ c) => c.id === check.id);
+    // The project's own command wins, but it runs at least wherever the pack's would.
+    if (existing) existing.stages = [...new Set([...(existing.stages ?? []), ...check.stages])];
+    else out.checks.push(check);
+  }
   return out;
 }
 
@@ -120,14 +124,20 @@ export function adoptPack(root, { force = false } = {}) {
   const pkgPath = join(root, 'package.json');
   const pkg = existsSync(pkgPath) ? readJson(pkgPath) : { name: 'workspace', private: true };
   pkg.scripts ??= {};
-  const added = Object.keys(fragment.scripts).filter((name) => !(name in pkg.scripts));
-  for (const name of added) pkg.scripts[name] = fragment.scripts[name];
-  for (const name of Object.keys(fragment.scripts)) {
-    if (!added.includes(name) && pkg.scripts[name] !== fragment.scripts[name]) out.notes.push(`package.json already has a "${name}" script (kept): the pack's checks expect "${fragment.scripts[name]}"`);
+  const roots = ['apps', 'libs'].filter((d) => existsSync(join(root, d)));
+  /** @type {Record<string, string>} */
+  const scripts = { ...fragment.scripts };
+  if (roots.length > 0) scripts.arch = scripts.arch.replace('apps libs', roots.join(' '));
+  const added = Object.keys(scripts).filter((name) => !(name in pkg.scripts));
+  for (const name of added) pkg.scripts[name] = scripts[name];
+  const pinsPnpm = !pkg.packageManager;
+  if (pinsPnpm) pkg.packageManager = fragment.packageManager;
+  for (const name of Object.keys(scripts)) {
+    if (!added.includes(name) && pkg.scripts[name] !== scripts[name]) out.notes.push(`package.json already has a "${name}" script (kept): the pack's checks expect "${scripts[name]}"`);
   }
-  if (added.length > 0) {
+  if (added.length > 0 || pinsPnpm) {
     writeJson(pkgPath, pkg);
-    out.merged.push(`package.json scripts (${added.join(', ')})`);
+    out.merged.push(`package.json (${[...(added.length > 0 ? [`scripts ${added.join(', ')}`] : []), ...(pinsPnpm ? [`packageManager ${fragment.packageManager}`] : [])].join('; ')})`);
   }
 
   const gitignore = join(root, '.gitignore');

@@ -26,6 +26,16 @@ test("the pack's pinned tools and scripts are the fixture's", () => {
   const fragment = JSON.parse(readFileSync(join(TEMPLATES, 'package.fragment.json'), 'utf8'));
   assert.deepEqual(fragment.devDependencies, fixture.devDependencies);
   assert.deepEqual(fragment.scripts, fixture.scripts);
+  assert.equal(fragment.packageManager, fixture.packageManager);
+});
+
+test("the project CI workflow keeps Keel's own files out of the checkers' reach", () => {
+  const workflow = readFileSync(join(TEMPLATES, '.github', 'workflows', 'keel.yml'), 'utf8');
+  assert.doesNotMatch(workflow, /path: \.keel-cli|node \.keel-cli/, 'no Keel checkout inside the workspace');
+  assert.match(workflow, /git clone [^\n]* "\$RUNNER_TEMP\/keel-cli"/);
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /keel" ci --base/);
+  assert.match(workflow, /keel-nestjs" canaries/);
 });
 
 test('the fixture carries every verbatim template unchanged', () => {

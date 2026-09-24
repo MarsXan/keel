@@ -7,7 +7,7 @@ const skills = new URL('../skills/', import.meta.url);
 const rules = new URL('../rules/', import.meta.url);
 const USER_ONLY = new Set(['adopt', 'new-context']);
 const PHRASES = {
-  adopt: [/keel-nestjs adopt/, /keel-nestjs canaries/, /\/keel:amend/, /\/keel:approve amend/, /never\s+edit a canary/],
+  adopt: [/keel-nestjs adopt/, /their own\s+terminal/, /keel-nestjs canaries/, /\/keel:amend/, /\/keel:approve amend/, /never\s+edit a canary/],
   'new-context': [/approved spec and plan/, /keel task T-n red/, /Write tool \(never\s+a script\)/, /pnpm install/, /no speculative files/],
   conventions: [/domain-no-framework/, /apps-only-public-api/, /Consumer-owned ports/, /keel-nestjs canaries/],
 };

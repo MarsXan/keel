@@ -2,8 +2,9 @@ name: keel
 
 # Keel's server-side gate and the proof that the checkers still bite, on every pull request.
 # Set the repository variable KEEL_REPOSITORY (owner/repo of your Keel checkout) and, when
-# that repository is private, a KEEL_TOKEN secret that can read it. Changes to this file go
-# through /keel:amend.
+# that repository is private, a KEEL_TOKEN secret that can read it. package.json needs a
+# packageManager field (keel-nestjs adopt adds one). Changes to this file go through
+# /keel:amend.
 on:
   pull_request:
   push:
@@ -28,14 +29,14 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Check out the Keel CLI
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.KEEL_REPOSITORY }}
-          ref: ${{ vars.KEEL_REF || 'main' }}
-          token: ${{ secrets.KEEL_TOKEN || github.token }}
-          path: .keel-cli
+      # Outside the workspace: the project's checkers must never see Keel's own files.
+      - name: Fetch the Keel CLI
+        env:
+          KEEL_REPOSITORY: ${{ vars.KEEL_REPOSITORY }}
+          KEEL_REF: ${{ vars.KEEL_REF || 'main' }}
+          KEEL_TOKEN: ${{ secrets.KEEL_TOKEN || github.token }}
+        run: git clone --quiet --depth 1 --branch "$KEEL_REF" "https://x-access-token:${KEEL_TOKEN}@github.com/${KEEL_REPOSITORY}.git" "$RUNNER_TEMP/keel-cli"
       - name: keel ci (content rules, PR size, change files, guardrail records, checks)
-        run: node .keel-cli/plugins/keel/bin/keel ci --base "origin/$BASE"
+        run: node "$RUNNER_TEMP/keel-cli/plugins/keel/bin/keel" ci --base "origin/$BASE"
       - name: canaries (every checker rejects its planted violation)
-        run: node .keel-cli/plugins/keel-nestjs/bin/keel-nestjs canaries
+        run: node "$RUNNER_TEMP/keel-cli/plugins/keel-nestjs/bin/keel-nestjs" canaries

@@ -1,1 +1,1 @@
-export type * from '{{otherPackage}}';
+export * from '../../../{{other}}/src/index.js';

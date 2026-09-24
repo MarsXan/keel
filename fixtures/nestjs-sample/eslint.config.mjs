@@ -87,8 +87,18 @@ export default tseslint.config(
           message: 'Domain code has no timers: schedule work from the application layer through a port.',
         })),
       ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['timers', 'timers/promises', 'node:timers', 'node:timers/promises'].map((name) => ({
+            name,
+            message: 'Domain code has no timers: schedule work from the application layer through a port.',
+          })),
+        },
+      ],
       'no-restricted-syntax': [
         'error',
+        { selector: "MemberExpression[object.name='globalThis'][property.name=/^(Date|Math|setTimeout|setInterval|setImmediate|queueMicrotask)$/]", message: 'Reaching the clock, randomness or timers through globalThis is still reaching them: inject a port.' },
         { selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']", message: 'Inject the Clock port instead of calling Date.now() in domain code.' },
         { selector: "NewExpression[callee.name='Date']", message: 'Inject the Clock port instead of new Date() in domain code.' },
         { selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']", message: 'Inject a random source instead of Math.random() in domain code.' },

@@ -2,11 +2,11 @@
 // and every canary is rejected by its checker with the expected rule ID on the planted file.
 // Needs the fixture installed (`pnpm install` in fixtures/nestjs-sample); skipped otherwise.
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { CHECKERS, instantiate, layoutOf, loadCanaries, runCanary, runChecker, sweep } from '../lib/canaries.js';
-import { FIXTURE, PACK_ROOT, runPack, withFixture } from './helpers.js';
+import { FIXTURE, gitRepo, PACK_ROOT, runPack, withFixture } from './helpers.js';
 
 const installed = existsSync(join(FIXTURE, 'node_modules', '.bin', 'tsc'));
 const skip = installed ? false : 'fixture not installed: run `pnpm install` in fixtures/nestjs-sample';
@@ -55,3 +55,21 @@ test('keel-nestjs canaries reports the clean checks and every canary', { skip },
   assert.equal(r.code, 0, r.stdout);
   assert.match(r.stdout, /✓ arch[\s\S]*✓ lint[\s\S]*✓ types[\s\S]*✓ test[\s\S]*canaries: \d+ caught, 0 missed, 0 skipped[\s\S]*PASS/);
 }));
+
+test('a sweep touches only the folders canaries plant into', () =>
+  withFixture(() => {
+    const outside = join(FIXTURE, '__canary__outside.ts');
+    writeFileSync(outside, 'export {};\n');
+    try {
+      assert.deepEqual(sweep(FIXTURE), []);
+      assert.equal(existsSync(outside), true);
+    } finally {
+      rmSync(outside, { force: true });
+    }
+  }));
+
+test('keel-nestjs canaries fails when nothing could be planted', async () => {
+  const r = await runPack(['canaries', '--project', gitRepo({ commit: true })]);
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /canaries: 0 caught[\s\S]*no canary could be planted[\s\S]*FAIL/);
+});
