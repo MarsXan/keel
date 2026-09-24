@@ -6,6 +6,7 @@ export const VERSION = '0.3.0';
 export const USAGE = `usage: keel-nestjs <command> [options]
 
 commands:
+  adopt [--force]      install the pack into a project that adopted Keel
   canaries [--project dir]  every checker passes clean and rejects each planted violation
   --version            print the version`;
 
@@ -14,6 +15,7 @@ commands:
 
 /** @type {Record<string, () => Promise<Command>>} */
 const COMMANDS = {
+  adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
   canaries: () => import('./canaries.js').then((m) => m.canariesCommand),
 };
 

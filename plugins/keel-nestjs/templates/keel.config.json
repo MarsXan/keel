@@ -1,0 +1,26 @@
+{
+  "paths": {
+    "source": ["apps/**", "libs/**"],
+    "heavy": [
+      "**/migrations/**",
+      "**/prisma/schema.prisma",
+      "libs/contracts/**",
+      "libs/kernel/**",
+      "libs/*/src/domain/**/*.port.ts",
+      "libs/*/package.json",
+      "apps/*/package.json",
+      "tsconfig.base.json",
+      "pnpm-workspace.yaml"
+    ],
+    "protected": ["tsconfig.base.json", ".github/workflows/**"]
+  },
+  "packages": ["apps/*", "libs/*"],
+  "caps": { "fileLinesByPath": { "libs/*/src/domain/**": 200 } },
+  "checks": [
+    { "id": "typecheck", "run": "pnpm -s typecheck", "stages": ["stop", "ci"] },
+    { "id": "lint", "run": "pnpm -s exec eslint --max-warnings 0 {files}", "stages": ["stop"], "files": ["apps/**/*.ts", "libs/**/*.ts"] },
+    { "id": "lint-all", "run": "pnpm -s lint", "stages": ["ci"] },
+    { "id": "arch", "run": "pnpm -s arch", "stages": ["stop", "ci"] },
+    { "id": "test", "run": "pnpm -s test", "stages": ["stop", "ci"] }
+  ]
+}

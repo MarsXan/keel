@@ -19,7 +19,14 @@ function files(dir) {
 /** Templates that are project files as-is (not fragments the adopter merges). */
 const verbatim = files(TEMPLATES)
   .map((abs) => relative(TEMPLATES, abs))
-  .filter((rel) => rel !== 'keel.config.json' && !rel.startsWith('.github/'));
+  .filter((rel) => rel !== 'keel.config.json' && rel !== 'package.fragment.json' && !rel.startsWith('.github/'));
+
+test("the pack's pinned tools and scripts are the fixture's", () => {
+  const fixture = JSON.parse(readFileSync(join(FIXTURE, 'package.json'), 'utf8'));
+  const fragment = JSON.parse(readFileSync(join(TEMPLATES, 'package.fragment.json'), 'utf8'));
+  assert.deepEqual(fragment.devDependencies, fixture.devDependencies);
+  assert.deepEqual(fragment.scripts, fixture.scripts);
+});
 
 test('the fixture carries every verbatim template unchanged', () => {
   assert.ok(verbatim.length > 0);
