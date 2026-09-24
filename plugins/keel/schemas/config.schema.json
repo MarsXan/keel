@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MarsXan/keel/schemas/config.schema.json",
+  "title": "Keel project configuration (.keel/config.json)",
+  "description": "Every project-specific value Keel uses. Unknown keys are errors. Keys you omit take Keel's defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["keel"],
+  "$defs": {
+    "globs": { "type": "array", "items": { "type": "string" } },
+    "count": { "type": "integer", "minimum": 0 }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "keel": { "description": "Configuration format version.", "enum": ["0.1"] },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "baseBranch": { "type": "string", "default": "main" },
+        "protectedBranches": { "type": "array", "items": { "type": "string" }, "default": ["main"] },
+        "github": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "repo": { "type": "string", "description": "owner/name; enables GitHub issue ids" } }
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "changes": { "type": "string", "default": "docs/changes" },
+        "adr": { "type": "string", "default": "docs/adr" },
+        "constitution": { "type": "string", "default": "CONSTITUTION.md" },
+        "source": { "$ref": "#/$defs/globs", "description": "Source code: editable only under an approved plan." },
+        "tests": { "$ref": "#/$defs/globs", "description": "Test files: editable only by the test-writer / in the red stage." },
+        "heavy": { "$ref": "#/$defs/globs", "description": "Paths that force tier T2." },
+        "critical": { "$ref": "#/$defs/globs", "description": "Paths under mutation testing." },
+        "protected": { "$ref": "#/$defs/globs", "description": "Guardrail files: change only through /keel:amend." },
+        "docs": { "$ref": "#/$defs/globs" },
+        "secrets": { "$ref": "#/$defs/globs", "description": "Files the agent may never read (patterns may start with ~/)." },
+        "secretsAllow": { "$ref": "#/$defs/globs", "description": "Exceptions to secrets, e.g. .env.example." }
+      }
+    },
+    "packages": { "$ref": "#/$defs/globs", "description": "Package directories, e.g. apps/* and libs/*." },
+    "caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileLines": { "$ref": "#/$defs/count", "default": 300 },
+        "fileLinesByPath": { "type": "object", "additionalProperties": { "$ref": "#/$defs/count" } },
+        "testFileLines": { "$ref": "#/$defs/count", "default": 600 },
+        "prLines": { "$ref": "#/$defs/count", "default": 400 },
+        "claudeMdLines": { "$ref": "#/$defs/count", "default": 120 },
+        "ruleFileLines": { "$ref": "#/$defs/count", "default": 60 }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "run", "stages"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "run": { "type": "string", "minLength": 1, "description": "Placeholders: {files}, {packages}, {filters}." },
+          "stages": { "type": "array", "minItems": 1, "items": { "enum": ["edit", "stop", "ci"] } },
+          "files": { "$ref": "#/$defs/globs", "description": "Only changed files matching these globs are passed." },
+          "timeoutSec": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "tiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "t1MaxFiles": { "$ref": "#/$defs/count", "default": 8 } }
+    },
+    "models": { "type": "object", "additionalProperties": { "type": "string" } },
+    "bannedPatterns": {
+      "type": "array",
+      "items": { "type": "string", "format": "regex" },
+      "description": "Constructs whose count may never grow in gated files (suppressions, focused/skipped tests)."
+    }
+  }
+}
