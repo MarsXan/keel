@@ -71,3 +71,10 @@ test('caps block growth past the limit, not shrinking an oversized file', () => 
 test('binary content is not inspected', () => {
   assert.equal(evaluateContent('src/a.ts', null, 'eslint-disable\0', cfg).ok, true);
 });
+
+test('vitest modifiers and other suppressions are caught', () => {
+  for (const added of ['it.concurrent.skip("a", f)', 'it.skipIf(ci)("a", f)', 'test.fails("a", f)', 'describe.only.each([1])("a", f)', '// @ts-expect-error', '// biome-ignore lint: x', '# pylint: disable=all', 'x // NOSONAR']) {
+    assert.equal(evaluateContent('src/a.test.ts', '', added, cfg).ok, false, added);
+  }
+  assert.equal(evaluateContent('src/a.test.ts', '', 'it.each([1])("a", f)', cfg).ok, true);
+});

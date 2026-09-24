@@ -15,7 +15,8 @@ const BANNED_PATTERNS = [
   'eslint-disable',
   '@ts-ignore',
   '@ts-nocheck',
-  '\\b(?:it|test|describe|context|suite)\\.(?:only|skip|todo)\\b',
+  '@ts-expect-error',
+  '\\b(?:it|test|describe|context|suite|bench)(?:\\.(?:concurrent|sequential|shuffle|each))*\\.(?:only|skip|todo|skipIf|runIf|fails)\\b',
   '\\b(?:xit|xdescribe|xtest|fit|fdescribe)\\s*\\(',
   '\\bas any\\b',
   'istanbul ignore',
@@ -29,6 +30,13 @@ const BANNED_PATTERNS = [
   'pytest\\.mark\\.skip',
   '\\bt\\.Skip(?:Now)?\\(',
   '@Disabled\\b',
+  '\\bbiome-ignore\\b',
+  '\\bdeno-lint-ignore\\b',
+  '\\boxlint-disable\\b',
+  '\\bNOSONAR\\b',
+  '#\\s*pylint:\\s*disable',
+  'rubocop:disable',
+  'swiftlint:disable',
 ];
 
 /** @typedef {{ id: string, run: string, stages: string[], files?: string[], timeoutSec?: number }} Check */

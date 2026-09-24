@@ -6,7 +6,7 @@ import { parseChange } from '../lib/changefile.js';
 import { DEFAULT_CONFIG as C } from '../lib/config.js';
 import { sha256 } from '../lib/hash.js';
 import { auditWorkingTree, countAssertions, packagesOf } from '../lib/policy/diffaudit.js';
-import { gitRepo } from './helpers.js';
+import { git, gitRepo } from './helpers.js';
 
 const config = { ...C, paths: { ...C.paths, source: ['src/**'] }, packages: ['src/*'] };
 const change = { id: 'c', rel: 'docs/changes/c.md', tier: 'T1', parsed: parseChange('---\nid: c\ntier: T1\n---\n# C\n## Design\nd\n## Tasks\n- T-1 · files: src/**\n') };
@@ -93,4 +93,11 @@ test('assertion counting', () => {
 
 test('package directories from paths', () => {
   assert.deepEqual(packagesOf(['apps/api/src/main.ts', 'libs/x/a.ts', 'libs/x/b.ts', 'README.md'], ['apps/*', 'libs/*']), ['apps/api', 'libs/x']);
+});
+
+test('changes hidden with skip-worktree or assume-unchanged are findings', () => {
+  const dir = gitRepo({ files: { 'src/a/x.test.ts': 'expect(1)' }, commit: true });
+  git(dir, ['update-index', '--skip-worktree', 'src/a/x.test.ts']);
+  writeFileSync(join(dir, 'src/a/x.test.ts'), '');
+  assert.match(auditWorkingTree(dir, opts()).findings.join('\n'), /hidden from git status[\s\S]*src\/a\/x\.test\.ts/);
 });
