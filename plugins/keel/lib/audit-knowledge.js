@@ -49,12 +49,14 @@ export function references(text) {
 }
 
 /**
- * A path has a directory part: `domain/` or `dist/` alone names a kind of folder, not a
- * place in this repository.
+ * A repository path: relative, with a directory part (`domain/` or `dist/` alone names a
+ * kind of folder), not elided (`…/x.ts`) or templated (`YYYY-MM-DD`). An absolute span is a
+ * server path or a URL route, not a place in this repository.
  * @param {string} t
  */
 function looksLikePath(t) {
-  if (/^[a-z][\w+.-]*:/i.test(t) || /[*?[\]{}<>$|,;=()'"]/.test(t) || /^[-@~]/.test(t) || !t.replace(/\/+$/, '').includes('/')) return false;
+  if (/^[a-z][\w+.-]*:/i.test(t) || /[*?[\]{}<>$|,;=()'"]/.test(t) || /^[-@~/]/.test(t) || !t.replace(/\/+$/, '').includes('/')) return false;
+  if (/\.\.\.|…|YYYY|NNNN|XXXX/.test(t)) return false;
   const last = t.replace(/\/+$/, '').split('/').pop() ?? '';
   return t.endsWith('/') || /\.[A-Za-z0-9]{1,8}$/.test(last);
 }
@@ -81,9 +83,18 @@ function staleReferences(root, config) {
   const rulesDir = join(root, '.claude', 'rules');
   const rules = existsSync(rulesDir) ? readdirSync(rulesDir).filter((n) => n.endsWith('.md')).map((n) => `.claude/rules/${n}`) : [];
   const instructions = ['CLAUDE.md', 'AGENTS.md', config.paths.constitution, ...rules];
+  // Records describe their moment (change files, decisions, lessons, plans, specs); living
+  // docs and instructions must stay true.
   const records = [config.paths.changes, config.paths.adr, lessonsDir(config)].map((d) => `${d.replace(/\/+$/, '')}/**`);
+  records.push('**/plans/**', '**/specs/**', '**/archive/**');
   const tracked = (run(root, ['ls-files', '-z'], { allowFail: true }) ?? '').split('\0').filter(Boolean);
   const docs = tracked.filter((rel) => rel.endsWith('.md') && matchAny(rel, config.paths.docs) && !matchAny(rel, records) && !instructions.includes(rel));
+  const docRoots = config.paths.docs.map((g) => g.split('/').filter((s) => !/[*?[{]/.test(s)).join('/')).filter(Boolean);
+  // A partial path names a file by its tail (`tiers/hard.ts`); it is fine when a tracked file ends with it.
+  const known = (/** @type {string} */ target) => {
+    const t = target.replace(/^\.\//, '');
+    return tracked.some((f) => f === t || f.endsWith(`/${t}`) || (t.endsWith('/') && (f.startsWith(t) || f.includes(`/${t}`))));
+  };
   /** @type {Item[]} */
   const items = [];
   for (const [files, level] of /** @type {const} */ ([[instructions, 'fail'], [docs, 'warn']])) {
@@ -93,7 +104,8 @@ function staleReferences(root, config) {
       for (const ref of references(body)) {
         const fromFile = resolve(root, dirname(rel), ref.target);
         const fromRoot = resolve(root, ref.target.replace(/^\//, ''));
-        if (existsSync(fromFile) || (!ref.link && existsSync(fromRoot)) || (ref.link && ref.target.startsWith('/') && existsSync(fromRoot))) continue;
+        if (existsSync(fromFile) || (ref.link && ref.target.startsWith('/') && existsSync(fromRoot))) continue;
+        if (!ref.link && (existsSync(fromRoot) || docRoots.some((d) => existsSync(resolve(root, d, ref.target))) || known(ref.target))) continue;
         items.push({ level, where: `${rel}:${ref.line}`, message: `names ${ref.target}, which does not exist: fix or remove the reference` });
       }
     }

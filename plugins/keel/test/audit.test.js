@@ -13,7 +13,8 @@ test('references: code spans that look like paths and relative links, nothing el
   const md = [
     'See `docs/guide.md`, `src/a.ts:12` and [the plan](../plans/p.md#top).',
     'Not paths: `src/**/*.ts`, `docs/changes/<id>.md`, `node:test`, `@nestjs/common`, `--force`, `keel use`,',
-    '[site](https://example.com/x.md), [anchor](#section), `a/b`, `pnpm-lock.yaml`, `domain/`, `dist/`.',
+    '[site](https://example.com/x.md), [anchor](#section), `a/b`, `pnpm-lock.yaml`, `domain/`, `dist/`,',
+    '`/srv/app/.env`, `/.well-known/jwks.json`, `libs/x/.../y.ts`, `docs/load-test-YYYY-MM-DD.md`.',
     '```',
     'import x from "./not/checked.ts";',
     '`inside/fence.md`',
@@ -38,6 +39,10 @@ test('knowledge: stale references, unscoped or long rules, a long CLAUDE.md, les
       '.claude/rules/scoped.md': '---\npaths:\n  - "src/**"\n---\n# Scoped\n',
       'docs/lessons/0001-no-sleep.md': '# Lesson\n- **Mechanism:** `eslint.config.mjs`\n',
       'docs/lessons/0002-note.md': '# Lesson\nJust a note.\n',
+      'docs/game/rooms.md': 'Rooms: see `game/lobby.md`, `bots/brain.ts` and `bots/gone.ts`.\n',
+      'docs/game/lobby.md': '# Lobby\n',
+      'src/bots/brain.ts': 'export {};\n',
+      'docs/plans/p.md': 'Will add `src/planned.ts`.\n',
     },
   });
   const { config } = loadConfig(dir);
@@ -52,6 +57,9 @@ test('knowledge: stale references, unscoped or long rules, a long CLAUDE.md, les
   assert.doesNotMatch(text, /scoped\.md/);
   assert.match(text, /0001-no-sleep\.md its mechanism eslint\.config\.mjs no longer exists/);
   assert.match(text, /0002-note\.md names no mechanism/);
+  assert.doesNotMatch(text, /game\/lobby\.md|bots\/brain\.ts/, 'paths relative to the docs folder, and partial paths of real files, are fine');
+  assert.match(text, /warn docs\/game\/rooms\.md:1 names bots\/gone\.ts/);
+  assert.doesNotMatch(text, /planned\.ts/, 'plans are records');
 });
 
 test('memory: the folder is named after the project path; long indexes and rule-like notes are flagged', () => {
