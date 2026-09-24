@@ -78,6 +78,12 @@ function unwrapOnce(cmd) {
     }
     case 'doas':
       return run(skipOptions(argv, 1, { short: 'uC' }));
+    case 'noglob':
+    case 'nocorrect':
+    case '-':
+      return run(1); // zsh precommand modifiers
+    case 'repeat':
+      return run(2); // zsh: repeat N command
     case 'command':
     case 'builtin':
     case 'nohup':

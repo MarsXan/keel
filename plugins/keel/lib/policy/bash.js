@@ -135,7 +135,8 @@ function evaluateCommand(cmd, ctx) {
   const redirect = guardedWrite(outputs.map((r) => r.target), ctx, 'This redirect');
   if (redirect) return redirect;
   if (cmd.argv.length === 0) return secretRule(cmd, 'redirect', ctx);
-  const argv0 = staticWord(cmd.argv[0], cmd.dynamic[0], ctx);
+  const word = /^=[\w.+-]+$/.test(cmd.argv[0]) ? cmd.argv[0].slice(1) : cmd.argv[0]; // zsh: =git is the path of git
+  const argv0 = staticWord(word, cmd.dynamic[0], ctx);
   if (argv0 === null) return deny('The command name is computed at run time, so Keel cannot check it. Write the command out literally.');
   const nested = (/** @type {string} */ script, overrides = {}) => evaluateBash(script, { ...ctx, depth: ctx.depth + 1, ...overrides });
   const expanded = expandDefinition(cmd, argv0, ctx, nested);

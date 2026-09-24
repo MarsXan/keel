@@ -203,3 +203,10 @@ test('git internals are guarded against direct writes', () => {
     assert.equal(decide(c), 'deny', c);
   }
 });
+
+test('zsh precommand modifiers and =cmd expansion do not hide the command', () => {
+  for (const c of ['=git push --force origin HEAD:main', 'noglob git push --force', 'nocorrect git reset --hard', '- git push -f', 'repeat 2 git push --force', 'ls *(e:"git push":)']) {
+    assert.equal(decide(c), 'deny', c);
+  }
+  assert.equal(decide('noglob ls *.ts'), 'allow');
+});
