@@ -17,6 +17,7 @@ commands:
   check [--stage s]    run the configured checks on changed files (stage: stop | ci)
   diff-audit           audit the working tree against HEAD
   ci [--base ref]      the server-side gate for a branch
+  audit [--metrics] [--json] [--strict]  the weekly drift report: stale knowledge, harness, code health, rework
   --version            print the version`;
 
 /**
@@ -44,6 +45,7 @@ const COMMANDS = {
   'lint-change': () => import('./lint.js').then((m) => m.lintCommand),
   ci: () => import('./ci.js').then((m) => m.ciCommand),
   'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
+  audit: () => import('./audit.js').then((m) => m.auditCommand),
 };
 
 /** @returns {Io} */
