@@ -1,6 +1,6 @@
 {
   "name": "keel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tiered, human-gated agentic workflow with deterministic, fail-closed guardrails",
   "author": { "name": "Mohsen" },
   "license": "MIT",

@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runCli } from './helpers.js';
 
-test('keel --version prints the version', async () => {
+const read = (/** @type {string} */ rel) => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
+
+test('keel --version prints the version every manifest declares', async () => {
   const r = await runCli(['--version']);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /^0\.1\.0\s*$/);
+  const version = r.stdout.trim();
+  assert.match(version, /^\d+\.\d+\.\d+$/);
+  assert.equal(read('../.claude-plugin/plugin.json').version, version);
+  assert.equal(read('../package.json').version, version);
+  assert.equal(read('../../../package.json').version, version);
+  assert.equal(read('../../../.claude-plugin/marketplace.json').plugins.find((/** @type {any} */ p) => p.name === 'keel').version, version);
 });
 
 test('keel help prints usage', async () => {

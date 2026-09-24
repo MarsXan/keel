@@ -28,12 +28,14 @@ owner prompt ──▶ UserPromptSubmit ── /keel:approve … ──▶ .keel
 agent tool call ──▶ PreToolUse ── bash / edit / read / tool guards ──▶ allow · ask · deny (exit 2)
 end of turn ──▶ Stop / SubagentStop ── diff audit + configured checks ──▶ end · block · ESCALATE
 settings edit ──▶ ConfigChange ── blocked unless an amendment is approved
-backstops ──▶ permission deny rules · OS sandbox (denyWrite/denyRead) · CI
+git commit / push ──▶ git hooks ── the same approvals again; reference-transaction runs even with --no-verify
+backstops ──▶ permission deny rules · OS sandbox (denyWrite/denyRead) · keel ci on the server
 ```
 
 Every hook runs `keel guard <event>`: a zero-dependency Node CLI. Gating guards fail
-closed — any internal error exits 2, the only code Claude Code treats as "block". Projects
-that never adopted Keel are left alone.
+closed — any internal error exits 2, the only code Claude Code treats as "block". A shell
+write Keel can resolve (`sed -i`, a redirect, `cp`, `rm`) meets the same gates as the Edit
+tool. Projects that never adopted Keel are left alone.
 
 ## Install
 
@@ -59,32 +61,59 @@ claude plugin install keel@keel
 | `.claude/settings.json` | deny/ask rules, sandbox, `keel@keel` pinned, superpowers disabled |
 | `docs/adr/0001-adopt-keel.md` | the adoption decision |
 | `.gitignore` | `.keel/state/` stays local |
+| `.git/hooks/*` | pre-commit, pre-merge-commit, pre-push and reference-transaction re-check approvals inside Claude Code (they do nothing in your own terminal) |
 
 Run `keel doctor`, restart Claude Code, review the files and commit them yourself.
 
-## The workflow in one screen
+## The workflow
 
-1. Write the change file `docs/changes/<id>.md` (template: `plugins/keel/templates/change.md`)
-   and make it active: `keel use <id>`.
-2. Tiers only go up: **T0** docs/config · **T1** one flow, ≤ 8 files · **T2** anything heavier.
-3. The owner approves by typing, in their own prompt:
-   `/keel:approve spec` (T2) → `/keel:approve plan` → work → `/keel:approve commit` →
-   `/keel:approve pr`. Also `/keel:approve amend` and `/keel:approve scope <glob>`.
-4. `keel status` (or `/keel:status`) shows the active change and the next gate.
+The owner drives it with slash commands; each one stops at a gate only the owner can pass,
+by typing `/keel:approve …` in their own prompt.
+
+| Command | What happens | Stops at |
+|---|---|---|
+| `/keel:start <issue or task>` | issue, tier, branch, change file, `keel use` | spec (T2) or plan (T1) |
+| `/keel:spec` | intent, non-goals, testable `REQ-n` requirements, lint | `/keel:approve spec` |
+| `/keel:plan` | explorer and planner; design by layer; tasks with files and done-when; lint | `/keel:approve plan` |
+| `/keel:build` | per task: `keel task T-n red` → test-writer → RED confirmed → `green` freezes the tests → implementer → checks | every task done |
+| `/keel:verify` | `keel check --stage ci` and the verifier's REQ → test → code map | Verification written |
+| `/keel:review` | spec, standards and risk reviewers; each finding triaged; at most three rounds | a clean review |
+| `/keel:ship` | doc deltas, `/keel:approve commit`, the commit, `/keel:approve pr`, one push and one pull request | the owner merges |
+| `/keel:spike <question>` | a throwaway probe on a spike branch | findings |
+
+Tiers only go up: **T0** docs/config · **T1** one flow, ≤ 8 files, no heavy paths · **T2**
+anything heavier. Keel derives the floor from the declared paths. `keel status` (or
+`/keel:status`) shows the active change and the next gate; `keel ledger` is its handoff log.
+
+## Agents
+
+Nine subagents, each with the fewest tools its role needs. Keel enforces roles by
+`agent_type`, so a read-only role cannot write even through Bash.
+
+| Agent | May | Model |
+|---|---|---|
+| explorer · planner | read | sonnet · opus |
+| test-writer | write tests, in the red stage only | opus |
+| implementer | write code, never tests | sonnet |
+| verifier · reviewer-standards · auditor | read and run checks | opus · sonnet · sonnet |
+| reviewer-spec · reviewer-risk | read | opus |
+
+The disciplines `keel:tdd`, `keel:evidence`, `keel:escalate` and `keel:search-first` are
+model-invocable skills, preloaded into the workers that need them and named at session start.
 
 ## Red lines and their enforcers
 
 | Red line | Enforced by |
 |---|---|
-| R-1 no source/test edits without an approved plan | edit guard, diff audit |
-| R-2 no commit without an approval of exactly the staged diff | bash guard |
-| R-3 no push/PR without a one-time token; never protected branches, force, merge, tag, release | bash guard, deny rules |
-| R-4 no weakened tests | content policy, diff audit |
+| R-1 no source/test edits without an approved plan | edit guard (Edit and shell writes), diff audit |
+| R-2 no commit without an approval of exactly the staged diff | bash guard, git hooks |
+| R-3 no push/PR without a one-time token; never protected branches, force, merge, tag, release | bash guard, git hooks, deny rules |
+| R-4 no weakened tests | content policy, test freeze, diff audit |
 | R-5 no suppressions | content policy, diff audit |
 | R-6 guardrail files change only through `/keel:amend` | edit and bash guards, sandbox, ConfigChange |
 | R-7 files within their line caps | content policy, diff audit |
 | R-8 no unverified "done" | stop gate |
-| R-9 no hook bypasses | bash guard, deny rules |
+| R-9 no hook bypasses | bash guard, reference-transaction hook, deny rules |
 | R-10 no secrets | read guard, bash guard, sandbox |
 
 ## CLI
@@ -94,8 +123,15 @@ Run `keel doctor`, restart Claude Code, review the files and commit them yoursel
 | `keel guard <event>` | hook entry point (run by Claude Code only; the agent may not call it) |
 | `keel use <id>` | make a change file the active change |
 | `keel status` | active change, approvals, next gate |
-| `keel doctor [--quick]` | audit the harness: config, constitution, settings, permissions |
-| `keel adopt [--name --base --protected --github --source --packages]` | write the project layer |
+| `keel task <T-n> <stage>` | move a task through red → green → refactor → done (recorded by the Bash hook) |
+| `keel ledger [--tail n]` | the active change's log: approvals, stages, escalations, handoffs |
+| `keel lint-change [file] [--stage spec\|plan\|verify]` | lint a change file |
+| `keel check [--stage stop\|ci]` | the diff audit and the configured checks on changed files |
+| `keel diff-audit` | the diff audit alone |
+| `keel ci [--base ref]` | the server-side gate for a branch |
+| `keel doctor [--quick]` | audit the harness: config, constitution, settings, permissions, git hooks |
+| `keel adopt [--name --base --protected --github --source --packages]` | write the project layer and install the git hooks |
+| `keel git-hook <hook>` | git hook entry point (installed by adopt) |
 
 ## Develop
 
@@ -106,11 +142,14 @@ npm run typecheck    # JSDoc types, strict
 npm run validate     # claude plugin validate --strict
 ```
 
+Pressure and trigger evals (`claude plugin eval`) live in `plugins/keel/evals/`; how to run
+them and the latest results are in [`docs/evals/README.md`](docs/evals/README.md).
+
 ## Roadmap
 
-- **0.1 guards first** — this release.
-- **0.2 workflow** — start/spec/plan/build/verify/review/ship skills, the nine least-privilege
-  agents, change-file lint, tier floors from paths, ledger handoffs, git hooks, gate evals.
+- **0.1 guards first** — hooks, approvals, bash/edit/content policies, the stop gate.
+- **0.2 workflow** — this release: the workflow commands, the nine agents, change-file lint,
+  tier floors, task stages and the test freeze, git hooks, ledger handoffs, `keel ci`, evals.
 - **0.3 keel-nestjs** — configs, canaries, path-scoped rules and scaffolding for clean-architecture
   NestJS pnpm monorepos.
 - **0.4 learning loop** — audit, lessons that become checks, amendments, metrics.

@@ -7,7 +7,7 @@
     {
       "name": "keel",
       "description": "Tiered, human-gated agentic workflow with deterministic, fail-closed guardrails",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "development",
       "source": "./plugins/keel"
     }

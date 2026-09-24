@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.2.0 — workflow (unreleased)
+
+The gated pipeline on top of the 0.1 guards.
+
+- **Workflow commands** (user-only skills): `/keel:start`, `/keel:spec`, `/keel:plan`,
+  `/keel:build`, `/keel:verify`, `/keel:review`, `/keel:ship`, `/keel:spike`. Each names the
+  `keel` commands it runs and stops at an owner gate.
+- **Nine least-privilege agents**: explorer, planner, test-writer, implementer, verifier,
+  reviewer-spec, reviewer-standards, reviewer-risk, auditor. Roles are enforced by
+  `agent_type`: read-only roles cannot redirect, write, install or run mutating git; the
+  test-writer writes only tests and the implementer never does.
+- **Disciplines** (model-invocable, preloaded into the workers, named at session start):
+  `keel:tdd`, `keel:evidence`, `keel:escalate`, `keel:search-first`.
+- **Change-file lint** (`keel lint-change`), run again when the owner approves a spec or a
+  plan and by `keel ci` for every change file on a branch.
+- **Tier floors**: heavy paths and the T1 file limit raise the minimum tier; a plan below
+  its floor cannot be approved or build. A T2 plan is approved only after its spec.
+- **Task stages** (`keel task <T-n> red|green|refactor|done`), recorded by the Bash hook in
+  the hook-only store. Tests freeze when a task turns green: the edit guard refuses test
+  edits outside red, and the diff audit compares frozen hashes.
+- **Git hooks** installed by `keel adopt` and checked by `keel doctor`: pre-commit,
+  pre-merge-commit and pre-push re-check approvals; reference-transaction accepts only
+  fast-forward branch updates whose commits were approved, so `--no-verify` does not help.
+- **Ledger and handoff**: `keel ledger`; session start shows the last ledger lines and
+  pre-compact writes a handoff.
+- **`keel ci`**: the server-side gate against the merge base — content rules, the PR size
+  cap, change-file lint, an ADR or `Guardrail-Change:` trailer for guardrail edits, and the
+  ci-stage checks. `keel check [--stage]` and `keel diff-audit` report the same locally.
+- **Shell writes meet the Edit gates**: a write target Keel can resolve (`sed -i`,
+  redirects, `cp`, `mv`, `touch`, `rm`, …) gets the role, plan, heavy-path and test-freeze
+  rules at the tool call, and change files take the Edit tool only.
+- **Evals** (`plugins/keel/evals/`): seven pressure scenarios on real adoptions and five
+  discipline trigger cases, with a nightly cost-capped CI workflow. First smoke: the five
+  Edit/Write pressure cases score 1.00 with Keel and 0.00 without.
+- **Hardening** from two security reviews of 0.1: the owner's shell aliases and functions
+  (from the Claude Code shell snapshot) are expanded and judged; PATH shadowing, zsh
+  precommand modifiers and `=cmd`, dashed `git-*` binaries and `hub` are caught; direct
+  writes into `.git`, `rev:path` secret reads and dynamic git subcommands are denied; the
+  "last green" record moved to the hook-only store.
+
 ## 0.1.0 — guards first (unreleased)
 
 The first milestone: deterministic, fail-closed guardrails for Claude Code.
