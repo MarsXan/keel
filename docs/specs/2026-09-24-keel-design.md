@@ -332,7 +332,7 @@ Event and field names are verified against the installed Claude Code version at 
 ### 7.4 Default permissions and sandbox (settings template)
 - `deny`: `git push --force*`, `git commit --no-verify*`/`-n`, `git reset --hard*`, `git clean*`, `git stash*`, `git config*`, `gh pr merge*`, `git tag*`, `gh release*`, `rm -rf*`, `sudo*`, `Read(.env*)`, `Read(~/.ssh/**)`, `Edit(.keel/state/**)`.
 - `ask`: `git push*`, `gh pr create*`, `Edit(<each protected path>)` (the Keel guard additionally denies these unless the matching token/approval exists — a hook can tighten but never loosen a deny).
-- `sandbox`: enabled with `failIfUnavailable: true`; `allowUnsandboxedCommands: false`; `excludedCommands` limited to container tooling needed by integration tests; `filesystem.denyWrite` = protected paths + `.keel/state/approvals.jsonl`; `filesystem.denyRead` = `.env*`, `~/.ssh`.
+- `sandbox`: enabled with `failIfUnavailable: true`; `allowUnsandboxedCommands: false`; `excludedCommands` limited to `gh` (a Go program: under macOS Seatbelt it cannot verify TLS certificates, so it runs outside the sandbox but still through Keel's hooks and the permission rules) and container tooling needed by integration tests; `filesystem.denyWrite` = protected paths + `.keel/state/approvals.jsonl`; `filesystem.denyRead` = `.env*`, `~/.ssh`; `network.allowedDomains` = GitHub and the npm registry under both hostnames. Package-manager stores stay inside the project (the stack pack sets them), so no `allowWrite` widens the sandbox.
 - No wildcard interpreter allows; `keel doctor` reports broad allow rules and secrets embedded in rules.
 
 ## 8. Agents

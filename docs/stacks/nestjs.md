@@ -29,6 +29,13 @@ and records what it installed in `.keel/stack.json` for `keel doctor`'s drift ch
 the pinned `pnpm add -D -w …` line for the tools. Once the Keel project layer is committed,
 installing the pack is a guardrail change: it rides on `/keel:amend` with an ADR.
 
+Keel's sandbox lets commands write only inside the project, so the adopter also keeps pnpm's
+store there: it creates `pnpm-workspace.yaml` (`apps/*`, `libs/*`) when it is missing and sets
+`storeDir: .pnpm-store`, which is git-ignored and ESLint-ignored. pnpm resolves that store at
+the workspace root from any package folder. Its metadata cache stays global: the sandbox
+cannot write it, and pnpm installs without it. A project that already set `storeDir` keeps
+it; the adopter notes one outside the project, where sandboxed installs fail.
+
 `keel-nestjs canaries [--project dir]` then proves the setup: every configured checker passes
 the project clean, and rejects every planted violation with its rule ID; a run where nothing
 could be planted fails. A mutation test in the pack switches each rule off and requires its

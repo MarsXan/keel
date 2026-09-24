@@ -44,7 +44,16 @@ export const READ_DENY = [
 
 export const STATE_EDIT_DENY = 'Edit(/.keel/state/**)';
 export const APPROVALS_SANDBOX_PATH = './.keel/state/approvals.jsonl';
-export const DEV_DOMAINS = ['github.com', 'api.github.com', 'codeload.github.com', 'objects.githubusercontent.com', 'registry.npmjs.org'];
+/** Hosts sandboxed commands may reach; npm configs name the registry by either hostname. */
+export const DEV_DOMAINS = ['github.com', 'api.github.com', 'codeload.github.com', 'objects.githubusercontent.com', 'registry.npmjs.org', 'registry.npmjs.com'];
+
+/**
+ * Commands that run outside the sandbox. `gh` is a Go program: under macOS Seatbelt it cannot
+ * reach the system trust service, so every HTTPS call fails certificate verification
+ * (x509: OSStatus -26276). Outside the sandbox it still passes Keel's hooks and the
+ * permission rules.
+ */
+export const SANDBOX_EXCLUDED = ['gh *'];
 
 /**
  * Permission-rule form of a protected glob: basename patterns apply at any depth.
@@ -78,13 +87,13 @@ export function keelSettings(config, marketplacePath) {
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
-      excludedCommands: [],
+      excludedCommands: [...SANDBOX_EXCLUDED],
       filesystem: {
         denyWrite: [...config.paths.protected.map(sandboxPath), APPROVALS_SANDBOX_PATH],
         denyRead: ['./**/.env', './**/.env.*', '~/.ssh', '~/.aws', '~/.gnupg'],
         allowRead: config.paths.secretsAllow.map((name) => `./**/${name}`),
       },
-      network: { allowLocalBinding: true, allowedDomains: DEV_DOMAINS },
+      network: { allowLocalBinding: true, allowedDomains: [...DEV_DOMAINS] },
     },
     enabledPlugins: { 'keel@keel': true, 'superpowers@claude-plugins-official': false },
     extraKnownMarketplaces: { keel: { source: { source: 'directory', path: marketplacePath } } },

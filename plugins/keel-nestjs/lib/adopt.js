@@ -3,13 +3,14 @@
  * `keel-nestjs adopt`: installs the pack into a project that adopted Keel. It copies the
  * checker configs and path-scoped rules (never replacing a file without --force), merges the
  * pack's paths, caps and checks into .keel/config.json so that protection and limits only
- * grow, adds missing package.json scripts, and records what it installed in
+ * grow, adds missing package.json scripts, keeps pnpm's store inside the project (the
+ * sandbox lets commands write nowhere else), and records what it installed in
  * .keel/stack.json for `keel doctor`'s drift check. It installs no packages: it prints the
  * pinned command for the owner to run.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VERSION } from './cli.js';
 
@@ -17,7 +18,13 @@ const PACK = fileURLToPath(new URL('..', import.meta.url));
 const TEMPLATES = join(PACK, 'templates');
 /** Template files that are fragments merged into project files, not installed as-is. */
 const FRAGMENTS = new Set(['keel.config.json', 'package.fragment.json']);
-const IGNORES = ['node_modules/', 'coverage/', '**/__canary__*'];
+const IGNORES = ['node_modules/', 'coverage/', '**/__canary__*', '.pnpm-store/'];
+/**
+ * Sandboxed commands can write only inside the project, so pnpm's store lives there. Its
+ * metadata cache stays global: the sandbox cannot write it, and pnpm installs without it.
+ */
+const STORE_DIR = '.pnpm-store';
+const STORE_LINES = `# The sandbox lets commands write only inside the project, so pnpm keeps its store here.\nstoreDir: ${STORE_DIR}\n`;
 
 /**
  * @typedef {{ written: string[], skipped: string[], merged: string[], notes: string[] }} AdoptResult
@@ -88,6 +95,34 @@ export function mergeConfig(config, fragment) {
   return out;
 }
 
+/** @param {string} dir a storeDir value, unquoted */
+const insideProject = (dir) => dir !== '' && !isAbsolute(dir) && !dir.startsWith('~') && dir !== '..' && !dir.startsWith('../');
+
+/**
+ * Creates pnpm-workspace.yaml with the pack's package globs when it is missing (so
+ * `pnpm add -w` works) and gives it a store inside the project when it names none. A store
+ * the project already set elsewhere is kept, with a note.
+ * @param {string} root
+ * @param {string[]} packages
+ * @param {AdoptResult} out
+ */
+function ensureWorkspace(root, packages, out) {
+  const path = join(root, 'pnpm-workspace.yaml');
+  if (!existsSync(path)) {
+    writeFileSync(path, `packages:\n${packages.map((p) => `  - ${p}\n`).join('')}${STORE_LINES}`);
+    out.written.push('pnpm-workspace.yaml');
+    return;
+  }
+  const text = readFileSync(path, 'utf8');
+  const store = /^storeDir:[ \t]*(.*?)[ \t]*$/m.exec(text);
+  if (!store) {
+    writeFileSync(path, `${text.replace(/\n*$/, '\n')}${STORE_LINES}`);
+    out.merged.push(`pnpm-workspace.yaml (storeDir ${STORE_DIR})`);
+  } else if (!insideProject(store[1].replace(/^(['"])(.*)\1$/, '$2'))) {
+    out.notes.push(`pnpm-workspace.yaml keeps storeDir ${store[1]}: the sandbox lets commands write only inside the project, so sandboxed installs need a store there (such as ${STORE_DIR})`);
+  }
+}
+
 /**
  * @param {string} root the project root
  * @param {{ force?: boolean }} [options]
@@ -114,7 +149,8 @@ export function adoptPack(root, { force = false } = {}) {
   }
 
   const before = readJson(configPath);
-  const after = mergeConfig(before, readJson(join(TEMPLATES, 'keel.config.json')));
+  const configFragment = readJson(join(TEMPLATES, 'keel.config.json'));
+  const after = mergeConfig(before, configFragment);
   if (JSON.stringify(after) !== JSON.stringify(before)) {
     writeJson(configPath, after);
     out.merged.push('.keel/config.json (paths, packages, caps, checks)');
@@ -139,6 +175,8 @@ export function adoptPack(root, { force = false } = {}) {
     writeJson(pkgPath, pkg);
     out.merged.push(`package.json (${[...(added.length > 0 ? [`scripts ${added.join(', ')}`] : []), ...(pinsPnpm ? [`packageManager ${fragment.packageManager}`] : [])].join('; ')})`);
   }
+
+  ensureWorkspace(root, configFragment.packages ?? [], out);
 
   const gitignore = join(root, '.gitignore');
   const lines = existsSync(gitignore) ? readFileSync(gitignore, 'utf8').split('\n') : [];

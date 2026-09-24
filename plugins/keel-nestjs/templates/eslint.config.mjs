@@ -17,7 +17,7 @@ const same = (type) => ({ element: { type, captured: { context: '{{ from.element
 const any = (...types) => ({ element: { types: { anyOf: types } } });
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '*.config.*', '.dependency-cruiser.cjs'] },
+  { ignores: ['**/node_modules/**', '.pnpm-store/**', '**/dist/**', '**/coverage/**', '*.config.*', '.dependency-cruiser.cjs'] },
   {
     files: SOURCE,
     extends: [...tseslint.configs.strictTypeChecked, comments.recommended],

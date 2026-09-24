@@ -98,10 +98,18 @@ test('merging keeps the project settings and adds Keel', () => {
   assert.deepEqual(merged.permissions.allow, ['Bash(pnpm test)']);
   assert.equal(merged.permissions.deny.filter((r) => r === 'Bash(rm -rf *)').length, 1);
   assert.equal(merged.env.A, '1');
-  assert.deepEqual(merged.sandbox.excludedCommands, ['docker']);
+  assert.deepEqual(merged.sandbox.excludedCommands, ['docker', 'gh *']);
   assert.equal(merged.sandbox.enabled, true);
   assert.equal(merged.enabledPlugins['keel@keel'], true);
   assert.deepEqual(merged.extraKnownMarketplaces.keel, { source: { source: 'directory', path: '/keel' } });
+});
+
+test('the sandbox lets gh and the npm registry work, and nothing else out', () => {
+  const { sandbox } = keelSettings(DEFAULT_CONFIG, '/keel');
+  assert.deepEqual(sandbox.excludedCommands, ['gh *'], 'gh fails TLS verification under macOS Seatbelt');
+  assert.ok(sandbox.network.allowedDomains.includes('registry.npmjs.org'));
+  assert.ok(sandbox.network.allowedDomains.includes('registry.npmjs.com'), 'npm configs use either hostname');
+  assert.equal(sandbox.allowUnsandboxedCommands, false);
 });
 
 test('stack drift: a missing installed file fails, a changed one warns', () => {

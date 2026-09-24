@@ -39,6 +39,10 @@ test('installs the checker configs and rules, merges the configuration, records 
   assert.match(r.stdout, /already has a "test" script \(kept\)/);
   assert.match(r.stdout, /pnpm add -D -w [\s\S]*typescript@6\.0\.3/);
   assert.match(readFileSync(join(dir, '.gitignore'), 'utf8'), /\*\*\/__canary__\*/);
+  assert.match(readFileSync(join(dir, '.gitignore'), 'utf8'), /^\.pnpm-store\/$/m);
+  const workspace = readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8');
+  assert.match(workspace, /^packages:\n {2}- apps\/\*\n {2}- libs\/\*\n/, 'the workspace `pnpm add -w` needs');
+  assert.match(workspace, /^storeDir: \.pnpm-store$/m, 'the sandbox lets pnpm write only inside the project');
   const stack = json(dir, '.keel/stack.json');
   assert.equal(stack.name, 'keel-nestjs');
   assert.equal(Object.keys(stack.files).length, packFiles().length);
@@ -47,6 +51,7 @@ test('installs the checker configs and rules, merges the configuration, records 
   const again = await runPack(['adopt'], { cwd: dir });
   assert.match(again.stdout, /skipped \(already there/);
   assert.deepEqual(json(dir, '.keel/config.json'), config, 'a second run changes nothing');
+  assert.equal(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8'), workspace);
   writeFileSync(join(dir, 'eslint.config.mjs'), 'export default [];\n');
   assert.equal(runDoctor(dir, { quick: true }).results.find((x) => x.id === 'stack.drift')?.level, 'warn');
 });
@@ -60,6 +65,23 @@ test('merging only tightens', () => {
   assert.equal(merged.caps.fileLinesByPath['libs/*/src/domain/**'], 150);
   assert.deepEqual(merged.checks.map((c) => c.run), ['make test', 'x']);
   assert.deepEqual(merged.checks[0].stages, ['ci', 'stop'], "the project's command runs wherever the pack's would");
+});
+
+test("an existing workspace keeps its packages and gains a store inside the project", async () => {
+  const workspace = async (text) => {
+    const dir = await keelProject();
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), text);
+    const r = await runPack(['adopt'], { cwd: dir });
+    assert.equal(r.code, 0, r.stderr);
+    return { text: readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8'), stdout: r.stdout };
+  };
+  const added = await workspace('packages:\n  - packages/*');
+  assert.match(added.text, /^packages:\n {2}- packages\/\*\n[\s\S]*^storeDir: \.pnpm-store\n$/m);
+  const inside = await workspace('packages:\n  - apps/*\nstoreDir: .store\n');
+  assert.equal(inside.text, 'packages:\n  - apps/*\nstoreDir: .store\n', 'a store inside the project is kept');
+  const outside = await workspace("packages:\n  - apps/*\nstoreDir: '/var/pnpm'\n");
+  assert.equal(outside.text, "packages:\n  - apps/*\nstoreDir: '/var/pnpm'\n");
+  assert.match(outside.stdout, /keeps storeDir '\/var\/pnpm'.*inside the project/);
 });
 
 test('the architecture script names only the planting roots the project has', async () => {

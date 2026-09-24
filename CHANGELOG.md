@@ -15,6 +15,21 @@
 - **The amend flow, end to end**, and an audit of the fixture as Keel and the pack adopt it.
 - **The weekly audit guide** and a scheduled workflow template.
 
+### Sandbox fixes from the first adoption
+Found by running an adopted project's sandbox settings in a headless session on macOS, and
+verified the same way after the fix.
+- **pnpm:** sandboxed commands can write only inside the project, so `pnpm add` failed on
+  its global store. `keel-nestjs adopt` now keeps the store in the project: it creates
+  `pnpm-workspace.yaml` when missing (which also makes the `pnpm add -D -w` line it prints
+  work on a new project) and sets `storeDir: .pnpm-store`, git-ignored and ESLint-ignored.
+  pnpm's metadata cache stays global: the sandbox cannot write it, and pnpm installs without it.
+- **gh:** `gh` fails certificate verification under macOS Seatbelt (`x509: OSStatus -26276`);
+  the settings template now lists it in `sandbox.excludedCommands`, so it runs outside the
+  sandbox but still through Keel's hooks and the permission rules. Only a plain `gh` command
+  leaves the sandbox; chained or piped, it stays inside and fails.
+- **npm registry:** `registry.npmjs.com` is allowed next to `registry.npmjs.org`; npm configs
+  name the registry by either hostname.
+
 ### Fixes from the M4 review
 - **Security:** git accepts any unambiguous prefix of a long option, so `git commit
   --no-verif`, `git checkout --or`, `git config --unset-a` and `git push --rep=` slipped
