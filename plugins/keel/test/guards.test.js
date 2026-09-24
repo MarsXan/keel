@@ -200,3 +200,36 @@ test('Read and Grep may not open secret files', async () => {
   assert.equal((await guard(dir, 'read', { tool_name: 'Grep', tool_input: { pattern: 'KEY', path: join(dir, '.env') } })).code, 2);
   assert.equal((await guard(dir, 'read', { tool_name: 'Grep', tool_input: { pattern: 'KEY' } })).code, 0);
 });
+
+test('a forged "last green" in current.json does not skip verification', async () => {
+  const dir = adoptedRepo({ 'src/a/x.ts': '1\n' });
+  writeFileSync(join(dir, 'src/a/x.ts'), '1 // eslint-disable-line\n');
+  const fingerprint = (await import('../lib/git.js')).worktreeFingerprint(dir);
+  writeFiles(dir, { '.keel/state/current.json': JSON.stringify({ lastGreen: fingerprint }) });
+  const r = await guard(dir, 'stop', { last_assistant_message: 'done' });
+  assert.equal(JSON.parse(r.stdout).decision, 'block');
+});
+
+test('a verified turn is recorded in the hook-only store and skips re-checking', async () => {
+  const dir = adoptedRepo({ 'docs/n.md': 'a\n' });
+  writeFileSync(join(dir, 'docs/n.md'), 'b\n');
+  assert.equal((await guard(dir, 'stop', { last_assistant_message: 'done' })).stdout, '');
+  assert.match(readFileSync(join(dir, '.keel/state/approvals.jsonl'), 'utf8'), /"type":"green"/);
+  assert.match((await keel(dir, ['status'])).stdout, /last verified: /);
+});
+
+test('keel check and keel diff-audit report canonically', async () => {
+  const dir = adoptedRepo({ 'src/a/x.ts': '1\n' });
+  writeFiles(dir, { '.keel/config.json': JSON.stringify({ keel: '0.1', paths: { source: ['src/**'] }, checks: [{ id: 'unit', run: 'echo running unit', stages: ['stop'] }] }) });
+  git(dir, ['commit', '-qam', 'config']);
+  const clean = await keel(dir, ['check']);
+  assert.equal(clean.code, 0, clean.stdout);
+  assert.match(clean.stdout, /diff audit: clean/);
+  writeFileSync(join(dir, 'src/a/x.ts'), '1 // eslint-disable-line\n');
+  const dirty = await keel(dir, ['check']);
+  assert.equal(dirty.code, 1);
+  assert.match(dirty.stdout, /eslint-disable[\s\S]*✓ unit[\s\S]*result: FAIL/);
+  const audit = await keel(dir, ['diff-audit']);
+  assert.equal(audit.code, 1);
+  assert.match(audit.stdout, /1 finding|finding\(s\)/);
+});

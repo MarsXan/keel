@@ -33,6 +33,8 @@ const COMMANDS = {
   use: () => import('./use.js').then((m) => m.useCommand),
   doctor: () => import('./doctor.js').then((m) => m.doctorCommand),
   adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
+  check: () => import('./check.js').then((m) => m.checkCommand),
+  'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
 };
 
 /** @returns {Io} */

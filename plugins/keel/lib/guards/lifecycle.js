@@ -3,6 +3,7 @@
 import { join } from 'node:path';
 import { VERSION } from '../cli.js';
 import { section, tasks } from '../changefile.js';
+import { lastGreen } from '../approvals.js';
 import { approvalQueries, readText } from '../context.js';
 import { runDoctor } from '../doctor.js';
 import { changedFiles, isRepo, worktreeFingerprint } from '../git.js';
@@ -100,7 +101,7 @@ function sessionEnd(_input, ctx) {
   if (!isRepo(ctx.root)) return { code: 0 };
   const dirty = changedFiles(ctx.root).filter((f) => !f.path.startsWith('.keel/state/'));
   if (dirty.length === 0) return { code: 0 };
-  const green = ctx.current.lastGreen === worktreeFingerprint(ctx.root);
+  const green = lastGreen(ctx.root)?.hash === worktreeFingerprint(ctx.root);
   const { changeId } = approvalQueries(ctx);
   appendLedger(ctx.root, changeId, `session ended with ${dirty.length} uncommitted file(s)${green ? ' (verified green)' : ' — NOT verified'}`);
   return { code: 0 };

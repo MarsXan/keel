@@ -4,6 +4,7 @@
  * and the configured checks, or the agent escalates honestly. Claude Code ends a turn after
  * 8 consecutive blocks anyway; Keel then records the turn as UNVERIFIED.
  */
+import { lastGreen, recordGreen } from '../approvals.js';
 import { approvalQueries } from '../context.js';
 import { runChecks } from '../checks.js';
 import { isRepo, worktreeFingerprint } from '../git.js';
@@ -32,7 +33,7 @@ export function stopGuard(input, ctx) {
     audit: () => auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: ctx.current.task?.frozenTests ?? {} }),
     diffHash: () => worktreeFingerprint(ctx.root),
     runChecks: (files, packages) => runChecks(ctx.root, ctx.config, 'stop', { files, packages }),
-    current: ctx.current,
+    current: { lastGreen: lastGreen(ctx.root)?.hash ?? null },
     auditOnly: role === 'keel:test-writer',
   });
   const who = role || 'main session';
@@ -45,7 +46,9 @@ export function stopGuard(input, ctx) {
     return { code: 0, stdout: block(d.reason ?? 'Keel: the working tree is not verified.') };
   }
   const summary = (d.results ?? []).map((r) => `${r.ok ? 'pass' : 'FAIL'} ${r.id}${r.skipped ? ' (skipped)' : ''}`).join(', ');
-  if (d.lastGreen) updateCurrent(ctx.root, { lastGreen: d.lastGreen, stopBlocks: 0, unverified: false, lastChecks: summary });
-  else if (ctx.current.stopBlocks) updateCurrent(ctx.root, { stopBlocks: 0 });
+  if (d.lastGreen) {
+    recordGreen(ctx.root, d.lastGreen, summary);
+    updateCurrent(ctx.root, { stopBlocks: 0, unverified: false, lastChecks: summary });
+  } else if (ctx.current.stopBlocks) updateCurrent(ctx.root, { stopBlocks: 0 });
   return { code: 0 };
 }

@@ -13,6 +13,7 @@ export const APPROVABLE = /** @type {const} */ (['spec', 'plan', 'diff', 'commit
  * @typedef {typeof APPROVABLE[number]} Approvable
  * @typedef {{ type: 'approve', id: string, ts: string, change: string | null, what: Approvable, hash: string, arg: string | null, prompt: string }} ApprovalRecord
  * @typedef {{ type: 'consume', ts: string, ref: string, action: string }} ConsumeRecord
+ * @typedef {{ type: 'green', ts: string, hash: string, checks: string }} GreenRecord
  */
 
 /**
@@ -31,7 +32,7 @@ export function parseApproveCommand(prompt) {
   return { what, arg };
 }
 
-/** @param {string} root @returns {(ApprovalRecord | ConsumeRecord)[]} */
+/** @param {string} root @returns {(ApprovalRecord | ConsumeRecord | GreenRecord)[]} */
 function records(root) {
   return readJsonl(statePaths(root).approvals);
 }
@@ -116,4 +117,32 @@ export function approvedScopes(root, change) {
   return records(root)
     .filter((r) => r.type === 'approve' && r.what === 'scope' && r.change === change && r.arg)
     .map((r) => /** @type {string} */ (/** @type {ApprovalRecord} */ (r).arg));
+}
+
+/**
+ * Records that the Stop hook verified the working tree with this fingerprint. Green records
+ * live in the hook-only store (not in current.json, which agent subprocesses can write), so a
+ * forged "last green" cannot make the gate skip verification.
+ * @param {string} root
+ * @param {string} hash
+ * @param {string} checks summary of the checks that ran
+ */
+export function recordGreen(root, hash, checks) {
+  /** @type {GreenRecord} */
+  const record = { type: 'green', ts: new Date().toISOString(), hash, checks };
+  appendJsonl(statePaths(root).approvals, record);
+}
+
+/**
+ * The most recent verified fingerprint, or null.
+ * @param {string} root
+ * @returns {GreenRecord | null}
+ */
+export function lastGreen(root) {
+  const all = records(root);
+  for (let i = all.length - 1; i >= 0; i--) {
+    const r = all[i];
+    if (r.type === 'green') return /** @type {GreenRecord} */ (r);
+  }
+  return null;
 }

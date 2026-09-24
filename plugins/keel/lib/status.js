@@ -1,5 +1,6 @@
 // @ts-check
 /** `keel status` and the one-line reminders: the active change, its approvals, the next gate. */
+import { lastGreen } from './approvals.js';
 import { changeHash } from './artifacts.js';
 import { section, tierRank } from './changefile.js';
 import { approvalQueries, buildContext } from './context.js';
@@ -71,7 +72,8 @@ export function statusText(ctx) {
   }
   const task = ctx.current.task;
   if (task) lines.push(`task: ${task.id} (${task.stage})`);
-  if (ctx.current.lastGreen) lines.push(`last green: ${shortHash(ctx.current.lastGreen)}`);
+  const green = lastGreen(ctx.root);
+  if (green) lines.push(`last verified: ${green.ts} (${shortHash(green.hash)}${green.checks ? `; ${green.checks}` : ''})`);
   if (ctx.current.unverified) lines.push('WARNING: the last turn ended UNVERIFIED');
   lines.push(`next: ${nextGate(ctx)}`);
   return lines.join('\n');
