@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { parseApproveCommand, recordApproval } from '../approvals.js';
 import { branchHash, changeHash, worktreeHash } from '../artifacts.js';
 import { appendApproval, section, tierRank } from '../changefile.js';
-import { readText } from '../context.js';
+import { approvalQueries, readText } from '../context.js';
 import { currentBranch, stagedDiff } from '../git.js';
 import { sha256, shortHash } from '../hash.js';
 import { context } from '../io.js';
@@ -61,6 +61,9 @@ function approve(what, arg, prompt, ctx) {
     const constitution = readText(join(ctx.root, ctx.config.paths.constitution)) ?? '';
     const { errors } = lintChange(ch.parsed, { config: ctx.config, stage: what, constitution, rel: ch.rel });
     if (errors.length > 0) return fail(`${ch.rel} does not pass the ${what} lint yet:\n- ${errors.join('\n- ')}`);
+    if (what === 'plan' && tierRank(ch.tier) >= 2 && !approvalQueries(ctx).isApproved('spec', changeHash(ch.parsed, 'spec'))) {
+      return fail(`the spec of ${ch.id} is not approved, or changed after approval; a T2 plan is approved after its spec, so ask for /keel:approve spec first`);
+    }
   }
   const hash = artifactHash(what, arg, ctx);
   if (typeof hash !== 'string') return fail(hash.error);
