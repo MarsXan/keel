@@ -1,0 +1,1 @@
+{ "checker": "lint", "expect": "@typescript-eslint/ban-ts-comment" }
