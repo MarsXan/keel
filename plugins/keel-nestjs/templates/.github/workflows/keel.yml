@@ -1,0 +1,41 @@
+name: keel
+
+# Keel's server-side gate and the proof that the checkers still bite, on every pull request.
+# Set the repository variable KEEL_REPOSITORY (owner/repo of your Keel checkout) and, when
+# that repository is private, a KEEL_TOKEN secret that can read it. Changes to this file go
+# through /keel:amend.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  keel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE: ${{ github.base_ref || 'main' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # keel ci compares the branch with its merge base
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check out the Keel CLI
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.KEEL_REPOSITORY }}
+          ref: ${{ vars.KEEL_REF || 'main' }}
+          token: ${{ secrets.KEEL_TOKEN || github.token }}
+          path: .keel-cli
+      - name: keel ci (content rules, PR size, change files, guardrail records, checks)
+        run: node .keel-cli/plugins/keel/bin/keel ci --base "origin/$BASE"
+      - name: canaries (every checker rejects its planted violation)
+        run: node .keel-cli/plugins/keel-nestjs/bin/keel-nestjs canaries

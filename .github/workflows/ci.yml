@@ -22,6 +22,12 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Install dev tools (typescript, node types)
         run: npm install --no-audit --no-fund
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: fixtures/nestjs-sample/package.json
+      - name: Install the fixture monorepo (keel-nestjs canaries run against it)
+        run: pnpm install --frozen-lockfile
+        working-directory: fixtures/nestjs-sample
       - name: Type-check the CLI (JSDoc, strict)
         run: npm run typecheck
       - name: Unit and guard tests
@@ -30,3 +36,4 @@ jobs:
         run: |
           npx --yes @anthropic-ai/claude-code plugin validate . --strict
           npx --yes @anthropic-ai/claude-code plugin validate plugins/keel --strict
+          npx --yes @anthropic-ai/claude-code plugin validate plugins/keel-nestjs --strict
