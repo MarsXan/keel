@@ -2,7 +2,7 @@
 name: verify
 description: Verify the finished change against its spec with fresh evidence — the full checks, a read-only verifier's requirement map, and a filled Verification section — before review.
 disable-model-invocation: true
-allowed-tools: Bash(keel status) Bash(keel check *) Bash(keel lint-change *) Bash(keel diff-audit) Bash(git diff *) Bash(git log *)
+allowed-tools: Bash(keel status) Bash(keel check *) Bash(keel lint-change *) Bash(keel diff-audit) Bash(git diff *) Bash(git log *) Agent
 ---
 # Verify the active change
 

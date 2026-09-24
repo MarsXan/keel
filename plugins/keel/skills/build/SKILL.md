@@ -2,7 +2,7 @@
 name: build
 description: Build the active change task by task with red-green-refactor — a test-writer writes failing tests, a fresh implementer makes them pass, and every step is verified on disk. Needs an approved plan.
 disable-model-invocation: true
-allowed-tools: Bash(keel status) Bash(keel task *) Bash(keel check *) Bash(keel ledger *)
+allowed-tools: Bash(keel status) Bash(keel task *) Bash(keel check *) Bash(keel ledger *) Agent
 ---
 # Build the active change
 

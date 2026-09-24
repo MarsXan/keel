@@ -15,6 +15,16 @@
 - **The amend flow, end to end**, and an audit of the fixture as Keel and the pack adopt it.
 - **The weekly audit guide** and a scheduled workflow template.
 
+### Fixes from the M4 review
+- **Security:** git accepts any unambiguous prefix of a long option, so `git commit
+  --no-verif`, `git checkout --or`, `git config --unset-a` and `git push --rep=` slipped
+  past rules that refused the full spelling; every refused long option now matches its
+  abbreviations, and `--repo` is refused. `git rm -r` and `git mv` check every file under a
+  directory for protection and the edit gates, like `rm`.
+- **keel audit:** line counts see files over 1 MB; the memory folder is found through a
+  symlinked project path; first-pass acceptance counts `route: patch`, the form `/keel:review`
+  now records.
+
 ### Fixes from the M3 review
 - **Security:** `git config key value --get` and `git remote -v add` passed as reads (git
   stops parsing options at the first operand); with `core.fsmonitor` set, the next

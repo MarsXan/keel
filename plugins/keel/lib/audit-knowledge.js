@@ -137,14 +137,17 @@ function ruleFiles(root, config) {
 }
 
 /**
- * The project's Claude Code memory folder: its name is the project path with every
- * character that is not a letter or digit replaced by "-".
- * @param {string} root
+ * The project's Claude Code memory folder: its name is the project path Claude Code was
+ * started in, with every character that is not a letter or digit replaced by "-". That path
+ * may be a symbolic link to the real root, so both are tried; the first that exists wins.
+ * @param {string} root the real project root
  * @param {string} home
  * @param {NodeJS.ProcessEnv} env
  */
 export function memoryDir(root, home, env) {
-  return join(env.CLAUDE_CONFIG_DIR || join(home, '.claude'), 'projects', root.replace(/[^A-Za-z0-9]/g, '-'), 'memory');
+  const base = join(env.CLAUDE_CONFIG_DIR || join(home, '.claude'), 'projects');
+  const dirs = [env.CLAUDE_PROJECT_DIR, root].filter((p) => typeof p === 'string' && p !== '').map((p) => join(base, /** @type {string} */ (p).replace(/[^A-Za-z0-9]/g, '-'), 'memory'));
+  return dirs.find((d) => existsSync(d)) ?? dirs[dirs.length - 1];
 }
 
 /**

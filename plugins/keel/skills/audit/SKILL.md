@@ -2,7 +2,7 @@
 name: audit
 description: The weekly health check — run keel audit, have the read-only auditor judge it against the repository, and hand the owner issue drafts for what should change.
 disable-model-invocation: true
-allowed-tools: Bash(keel audit *) Bash(keel doctor *) Bash(gh issue list *) Read Grep Glob
+allowed-tools: Bash(keel audit *) Bash(keel doctor *) Bash(gh issue list *) Read Grep Glob Agent
 ---
 # Weekly audit
 

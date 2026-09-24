@@ -2,7 +2,7 @@
 name: plan
 description: Plan the active change — find reusable code, design it by layer, split it into small tasks with files and done-when commands, check it against the constitution, then stop for the owner's /keel:approve plan.
 disable-model-invocation: true
-allowed-tools: Bash(keel status) Bash(keel lint-change *) Read Grep Glob
+allowed-tools: Bash(keel status) Bash(keel lint-change *) Read Grep Glob Agent
 ---
 # Plan the active change
 

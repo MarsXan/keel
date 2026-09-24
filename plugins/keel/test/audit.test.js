@@ -1,5 +1,6 @@
 // keel audit: stale knowledge, rule files, memory notes, lessons, code health and metrics.
 import assert from 'node:assert/strict';
+import { symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { knowledgeItems, memoryDir, references } from '../lib/audit-knowledge.js';
@@ -106,14 +107,15 @@ test('metrics: fix share per month, first-pass acceptance and ledger events', ()
   const change = (id, tier, status, review) => `---\nid: ${id}\ntier: ${tier}\nstatus: ${status}\n---\n# ${id}\n## Review\n${review}\n`;
   writeFiles(dir, {
     'docs/changes/1-a.md': change('1-a', 'T1', 'done', 'Round 1: no findings.'),
-    'docs/changes/2-b.md': change('2-b', 'T2', 'done', '- R-3 caps: route patch, fixed in round 2'),
+    'docs/changes/2-b.md': change('2-b', 'T2', 'done', '- R-3 caps exceeded — route: patch — fixed in round 2'),
+    'docs/changes/5-e.md': change('5-e', 'T1', 'done', '- a finding that mentions a patch file — route: defer — issue #9'),
     'docs/changes/3-c.md': change('3-c', 'T0', 'done', ''),
     'docs/changes/4-d.md': change('4-d', 'T1', 'abandoned', ''),
   });
   const { config } = loadConfig(dir);
   const flow = changeFlow(dir, config);
-  assert.deepEqual({ total: flow.total, done: flow.done, firstPass: flow.firstPass }, { total: 4, done: 2, firstPass: 1 });
-  assert.deepEqual(flow.tiers, { T1: 2, T2: 1, T0: 1 });
+  assert.deepEqual({ total: flow.total, done: flow.done, firstPass: flow.firstPass }, { total: 5, done: 3, firstPass: 2 }, 'only a patch route counts as rework');
+  assert.deepEqual(flow.tiers, { T1: 3, T2: 1, T0: 1 });
 
   const now = new Date('2026-09-24T12:00:00.000Z');
   writeFiles(dir, {
@@ -133,4 +135,34 @@ test('keel audit on the command line: markdown, json, and --strict', async () =>
   assert.ok(json.knowledge.some((i) => i.level === 'fail'));
   assert.equal((await runCli(['audit', '--strict'], { cwd: dir, env })).code, 1);
   assert.equal((await runCli(['audit'], { cwd: gitRepo({ commit: true }), env: { HOME: env.HOME } })).code, 1, 'a project that never adopted Keel');
+});
+
+test('unusual repositories: a project below the git top level, odd names, a file over 1 MB, a detached HEAD', () => {
+  const top = gitRepo({ commit: true, files: { 'README.md': 'x\n' } });
+  const root = join(top, 'services', 'shop');
+  writeFiles(root, {
+    '.keel/config.json': JSON.stringify({ keel: '0.1', paths: { source: ['src/**'] }, caps: { fileLines: 100 } }),
+    'src/café menu.ts': 'export const a = 1;\n',
+    'src/generated.ts': '// x\n'.repeat(300_000),
+  });
+  git(top, ['add', '-A']);
+  git(top, ['commit', '-qm', 'feat: the shop']);
+  writeFiles(root, { 'src/café menu.ts': 'export const a = 2;\n' });
+  git(top, ['commit', '-qam', 'fix: the menu']);
+  git(top, ['checkout', '-q', '--detach']);
+  const { config } = loadConfig(root);
+  assert.deepEqual(hotspots(root, config).map((h) => h.path), ['src/generated.ts', 'src/café menu.ts']);
+  assert.deepEqual(treeHealth(root, config).overCap, [{ path: 'src/generated.ts', lines: 300_000, cap: 100 }], 'a file over 1 MB is still counted');
+  assert.deepEqual(fixShare(root).map((m) => m.fixes), [1]);
+});
+
+test('memory: a project reached through a symbolic link is found under its launch path', () => {
+  const real = gitRepo({ commit: true, files: { '.keel/config.json': CONFIG } });
+  const home = tmpDir();
+  const launch = join(tmpDir(), 'via-link');
+  symlinkSync(real, launch);
+  writeFiles(join(home, '.claude', 'projects', launch.replace(/[^A-Za-z0-9]/g, '-'), 'memory'), { 'MEMORY.md': 'x\n'.repeat(250) });
+  assert.match(memoryDir(real, home, { CLAUDE_PROJECT_DIR: launch }), /via-link\/memory$/);
+  const { config } = loadConfig(real);
+  assert.match(knowledgeItems(real, config, { home, env: { CLAUDE_PROJECT_DIR: launch } }).map((i) => i.message).join('\n'), /250 lines/);
 });

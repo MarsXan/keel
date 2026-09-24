@@ -4,7 +4,7 @@
  * debt the tree carries, and — with --metrics — how much work is rework, how changes flowed
  * through the gates, and how often agents escalated or ended unverified.
  */
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseChange, section } from './changefile.js';
 import { readText } from './context.js';
@@ -18,6 +18,24 @@ import { statePaths } from './state.js';
  * @typedef {{ path: string, commits: number, lines: number }} Hotspot
  * @typedef {{ month: string, commits: number, fixes: number }} MonthShare
  */
+
+const MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Text of a file for the audit, without the 1 MB cap Keel's guards use: the largest files
+ * are the ones the audit exists to find. Null when missing, binary or over 50 MB.
+ * @param {string} abs
+ */
+function readLarge(abs) {
+  try {
+    const st = statSync(abs);
+    if (!st.isFile() || st.size > MAX_BYTES) return null;
+    const buf = readFileSync(abs);
+    return buf.includes(0) ? null : buf.toString('utf8');
+  } catch {
+    return null;
+  }
+}
 
 /** Tracked files Keel gates (source and tests). @param {string} root @param {KeelConfig} config */
 function gatedFiles(root, config) {
@@ -40,7 +58,7 @@ export function hotspots(root, config, { days = 90, top = 10 } = {}) {
   const gated = new Set(gatedFiles(root, config));
   return [...commits]
     .filter(([rel]) => gated.has(rel))
-    .map(([path, n]) => ({ path, commits: n, lines: lineCount(readText(join(root, path)) ?? '') }))
+    .map(([path, n]) => ({ path, commits: n, lines: lineCount(readLarge(join(root, path)) ?? '') }))
     .sort((a, b) => b.commits * b.lines - a.commits * a.lines || a.path.localeCompare(b.path))
     .slice(0, top);
 }
@@ -57,7 +75,7 @@ export function treeHealth(root, config) {
   const debt = new Map();
   const patterns = config.bannedPatterns.map((p) => ({ p, re: new RegExp(p) }));
   for (const rel of gatedFiles(root, config)) {
-    const body = readText(join(root, rel));
+    const body = readLarge(join(root, rel));
     if (body === null) continue;
     const cap = lineCap(rel, config);
     const lines = lineCount(body);
@@ -89,7 +107,8 @@ export function fixShare(root, { months = 6 } = {}) {
 
 /**
  * Change files by tier and status, and first-pass acceptance: done T1/T2 changes whose
- * Review section routed nothing back to the build (no "patch").
+ * Review section routed no finding back to the build (no `route: patch`, the form
+ * /keel:review records).
  * @param {string} root
  * @param {KeelConfig} config
  */
@@ -111,7 +130,7 @@ export function changeFlow(root, config) {
     statuses[status] = (statuses[status] ?? 0) + 1;
     if (status === 'done' && (tier === 'T1' || tier === 'T2')) {
       done++;
-      if (!/\bpatch\b/i.test(section(parsed, 'Review'))) firstPass++;
+      if (!/\broute:\s*patch\b/i.test(section(parsed, 'Review'))) firstPass++;
     }
   }
   return { total: files.length, tiers, statuses, done, firstPass };
