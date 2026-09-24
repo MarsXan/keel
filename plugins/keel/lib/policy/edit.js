@@ -5,10 +5,10 @@
  * a valid plan approval, roles are enforced by agent type, and content rules apply.
  */
 import { resolve } from 'node:path';
-import { changeHash } from '../artifacts.js';
 import { approvalsSection, parseChange, tasks, tierRank } from '../changefile.js';
 import { matchAny } from '../glob.js';
 import { classifier, realPath, toRel } from '../paths.js';
+import { amendApproved, planProblem } from './authority.js';
 import { afterContent, evaluateContent } from './content.js';
 import { ALLOW, ask, combine, deny } from './decision.js';
 
@@ -55,8 +55,7 @@ export function evaluateEdit(input, ctx) {
   const changeFile = changeFileRule(rel, before, after, ctx);
   if (changeFile) return changeFile;
   if (rels.some(c.isProtected)) {
-    const amended = ctx.change !== null && ctx.isApproved('amend', changeHash(ctx.change.parsed, 'amend'));
-    if (!amended) {
+    if (!amendApproved(ctx.change, ctx.isApproved)) {
       return deny(`${rel} is a protected guardrail file. It changes only through /keel:amend: describe the change in the active change file's Amendment section and ask the owner to type /keel:approve amend.`);
     }
     return contentDecision(rel, before, after, ctx) ?? ALLOW;
@@ -98,19 +97,9 @@ function changeFileRule(rel, before, after, ctx) {
  * @returns {Decision | null}
  */
 function planGate(rel, test, ctx) {
-  const ch = ctx.change;
-  if (!ch) {
-    return deny('There is no active change. Source and tests change only under an owner-approved plan: write the change file, make it active with `keel use <id>`, and ask the owner to type /keel:approve plan.');
-  }
-  const rank = tierRank(ch.tier);
-  if (rank < 0) return deny(`The active change ${ch.id} has no valid tier ("${ch.tier}"); set tier: T1 or T2 in ${ch.rel}.`);
-  if (rank === 0) return deny('T0 changes cannot touch source or tests. Raise the tier to T1 or T2 (tiers only go up) and get the plan approved.');
-  if (rank === 2 && !ctx.isApproved('spec', changeHash(ch.parsed, 'spec'))) {
-    return deny(`The spec of ${ch.id} is not approved, or changed after approval. Ask the owner to type /keel:approve spec.`);
-  }
-  if (!ctx.isApproved('plan', changeHash(ch.parsed, 'plan'))) {
-    return deny(`The plan of ${ch.id} is not approved, or changed after approval. Ask the owner to type /keel:approve plan.`);
-  }
+  const problem = planProblem(ctx.change, ctx.isApproved);
+  if (problem) return deny(problem);
+  const ch = /** @type {ActiveChange} */ (ctx.change);
   const scopes = ctx.approvedScopes();
   const task = ctx.current.task;
   if (test && task && task.stage !== 'red' && !scopes.includes('tests')) {
