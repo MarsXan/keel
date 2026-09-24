@@ -248,3 +248,13 @@ test('the bash guard expands the owner\'s shell aliases from the Claude Code sna
   assert.match(forced.stderr, /shell alias for "git push --force"/);
   assert.equal((await run('gst')).code, 0);
 });
+
+test('an approval is refused while the change file fails lint', async () => {
+  const dir = adoptedRepo({ 'docs/changes/c2.md': '---\nid: c2\ntier: T1\nstatus: plan\n---\n# C\n## Intent\nx TBD\n## Design\nd\n## Tasks\n- T-1 · files: src/**\n' });
+  assert.equal((await keel(dir, ['use', 'c2'])).code, 0);
+  const r = JSON.parse((await prompt(dir, '/keel:approve plan')).stdout).hookSpecificOutput.additionalContext;
+  assert.match(r, /nothing was recorded[\s\S]*placeholder \(TBD\)[\s\S]*T-1 has no done-when/);
+  const lint = await keel(dir, ['lint-change']);
+  assert.equal(lint.code, 1);
+  assert.match(lint.stdout, /has 2 problem\(s\)/);
+});

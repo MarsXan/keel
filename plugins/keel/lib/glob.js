@@ -137,3 +137,44 @@ function splitAlternatives(body) {
   parts.push(body.slice(start));
   return parts;
 }
+
+/**
+ * True when some path could match both patterns. Exact for literal segments, `*`/`?` and
+ * `**`; segments that both contain wildcards are assumed to overlap.
+ * @param {string} a
+ * @param {string} b
+ */
+export function globsIntersect(a, b) {
+  const split = (/** @type {string} */ p) => {
+    const n = normalizePath(p);
+    return (n.includes('/') ? n : `**/${n}`).split('/');
+  };
+  const sa = split(a);
+  const sb = split(b);
+  /** @type {Map<string, boolean>} */
+  const memo = new Map();
+  /** @param {number} i @param {number} j @returns {boolean} */
+  const inter = (i, j) => {
+    const key = `${i},${j}`;
+    const hit = memo.get(key);
+    if (hit !== undefined) return hit;
+    let r;
+    if (i === sa.length && j === sb.length) r = true;
+    else if (i < sa.length && sa[i] === '**') r = inter(i + 1, j) || (j < sb.length && inter(i, j + 1));
+    else if (j < sb.length && sb[j] === '**') r = inter(i, j + 1) || (i < sa.length && inter(i + 1, j));
+    else if (i === sa.length || j === sb.length) r = false;
+    else r = segmentsIntersect(sa[i], sb[j]) && inter(i + 1, j + 1);
+    memo.set(key, r);
+    return r;
+  };
+  return inter(0, 0);
+}
+
+/** @param {string} x @param {string} y */
+function segmentsIntersect(x, y) {
+  const wild = (/** @type {string} */ s) => /[*?[{]/.test(s);
+  if (!wild(x) && !wild(y)) return x === y;
+  if (!wild(x)) return new RegExp(`^${translate(y)}$`).test(x);
+  if (!wild(y)) return new RegExp(`^${translate(x)}$`).test(y);
+  return true;
+}

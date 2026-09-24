@@ -9,9 +9,11 @@ import { join } from 'node:path';
 import { parseApproveCommand, recordApproval } from '../approvals.js';
 import { branchHash, changeHash, worktreeHash } from '../artifacts.js';
 import { appendApproval, section, tierRank } from '../changefile.js';
+import { readText } from '../context.js';
 import { currentBranch, stagedDiff } from '../git.js';
 import { sha256, shortHash } from '../hash.js';
 import { context } from '../io.js';
+import { lintChange } from '../lint.js';
 import { reminder } from '../status.js';
 
 /**
@@ -54,6 +56,11 @@ function approve(what, arg, prompt, ctx) {
   const ch = ctx.change;
   const fail = (/** @type {string} */ why) => ({ text: `keel: nothing was recorded for /keel:approve ${what} — ${why}. Tell the owner.` });
   if (['spec', 'plan', 'amend', 'scope'].includes(what) && !ch) return fail('there is no active change (run `keel use <id>` first)');
+  if ((what === 'spec' || what === 'plan') && ch) {
+    const constitution = readText(join(ctx.root, ctx.config.paths.constitution)) ?? '';
+    const { errors } = lintChange(ch.parsed, { config: ctx.config, stage: what, constitution, rel: ch.rel });
+    if (errors.length > 0) return fail(`${ch.rel} does not pass the ${what} lint yet:\n- ${errors.join('\n- ')}`);
+  }
   const hash = artifactHash(what, arg, ctx);
   if (typeof hash !== 'string') return fail(hash.error);
   const record = recordApproval(ctx.root, { change: ch?.id ?? null, what, hash, arg, prompt: prompt.split('\n')[0] });

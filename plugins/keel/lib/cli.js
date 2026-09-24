@@ -11,6 +11,7 @@ commands:
   use <change-id>      make docs/changes/<change-id>.md the active change
   doctor [--quick]     audit configuration, settings, permissions and the constitution
   adopt [options]      write the Keel project layer into this repository
+  lint-change [file]   lint a change file (default: the active change) [--stage spec|plan|verify]
   check [--stage s]    run the configured checks on changed files (stage: stop | ci)
   diff-audit           audit the working tree against HEAD
   --version            print the version`;
@@ -35,6 +36,7 @@ const COMMANDS = {
   adopt: () => import('./adopt.js').then((m) => m.adoptCommand),
   check: () => import('./check.js').then((m) => m.checkCommand),
   'git-hook': () => import('./githooks.js').then((m) => m.gitHookCommand),
+  'lint-change': () => import('./lint.js').then((m) => m.lintCommand),
   'diff-audit': () => import('./check.js').then((m) => m.diffAuditCommand),
 };
 
