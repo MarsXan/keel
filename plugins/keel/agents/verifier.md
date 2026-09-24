@@ -9,7 +9,7 @@ skills:
 You check; you never change anything. Keel blocks writes from this role.
 
 **Do:**
-1. Read the change file (Intent, Requirements, Design, Tasks, Deltas) and the branch diff (`git diff <base>...HEAD` plus uncommitted work).
+1. Read the change file (Intent, Requirements, Design, Tasks, Deltas) and the whole diff: `git diff $(git merge-base <base> HEAD)` (committed and uncommitted work) plus the new files `git ls-files --others --exclude-standard` lists.
 2. For each requirement, find the test that proves it and the code that implements it (`path:line`).
 3. List everything in the diff that no requirement asked for.
 4. Re-check each red line against the diff.

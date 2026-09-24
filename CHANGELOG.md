@@ -5,8 +5,8 @@
 The gated pipeline on top of the 0.1 guards.
 
 - **Workflow commands** (user-only skills): `/keel:start`, `/keel:spec`, `/keel:plan`,
-  `/keel:build`, `/keel:verify`, `/keel:review`, `/keel:ship`, `/keel:spike`. Each names the
-  `keel` commands it runs and stops at an owner gate.
+  `/keel:build`, `/keel:verify`, `/keel:review`, `/keel:ship`, `/keel:spike`, `/keel:amend`.
+  Each names the `keel` commands it runs and stops at an owner gate.
 - **Nine least-privilege agents**: explorer, planner, test-writer, implementer, verifier,
   reviewer-spec, reviewer-standards, reviewer-risk, auditor. Roles are enforced by
   `agent_type`: read-only roles cannot redirect, write, install or run mutating git; the
@@ -22,9 +22,12 @@ The gated pipeline on top of the 0.1 guards.
   turns green its tests are frozen by byte hash and assertion count until the change is
   done. A later red stage may grow a frozen test but not weaken it, a shell write may not
   touch one, and `/keel:approve scope tests` lifts the freeze for edits and audit alike.
-- **Git hooks** installed by `keel adopt` and checked by `keel doctor`: pre-commit,
-  pre-merge-commit and pre-push re-check approvals; reference-transaction accepts only
-  fast-forward branch updates whose commits were approved, so `--no-verify` does not help.
+- **Git hooks** installed by `keel adopt` (or `keel adopt --hooks`) and checked by
+  `keel doctor`: pre-commit, pre-merge-commit and pre-push re-check approvals;
+  reference-transaction accepts only fast-forward branch updates whose commits were
+  approved, so `--no-verify` cannot land an unapproved local commit. A push made by a route
+  the bash guard cannot see skips pre-push with `--no-verify`; server-side branch protection
+  and `keel ci` are the backstop there.
 - **Ledger and handoff**: `keel ledger`; session start shows the last ledger lines and
   pre-compact writes a handoff.
 - **`keel ci`**: the server-side gate against the merge base — content rules, the PR size

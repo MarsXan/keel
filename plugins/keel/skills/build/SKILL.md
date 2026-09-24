@@ -19,7 +19,7 @@ The plan must be approved (`keel status`). Take the tasks in the order of the Ta
 
 **Rules for the whole build:**
 - If an edit outside the declared files is needed, the edit asks the owner; for more than one file, ask for `/keel:approve scope <glob>`.
-- `[P]` tasks may run in parallel worktrees only when their files are disjoint; otherwise run them one by one.
+- Run tasks one by one in this working tree. `[P]` marks tasks with disjoint files, whose order does not matter; another worktree is outside the change Keel gates, and Keel refuses edits there.
 - If a test looks wrong, or passing needs a rule broken, stop with a line starting `ESCALATE:`.
 
 When every task is done, continue with `/keel:verify`.

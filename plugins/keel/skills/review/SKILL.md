@@ -6,7 +6,12 @@ allowed-tools: Bash(keel status) Bash(keel check *) Bash(git diff *) Bash(gh iss
 ---
 # Review the active change
 
-1. **Run the reviewers.** Give each one the change file path, the changed files (`git diff --name-only <base>...HEAD`) and the diff text (`git diff <base>...HEAD`) — `keel:reviewer-spec` and `keel:reviewer-risk` cannot run git themselves.
+1. **Run the reviewers.** The work is not committed yet, so diff the working tree against the
+   merge base: `git diff $(git merge-base <base> HEAD)` for the text and
+   `git diff --name-only $(git merge-base <base> HEAD)` plus
+   `git ls-files --others --exclude-standard` for the files (new files are untracked). Give
+   each reviewer the change file path, the files and the diff text — `keel:reviewer-spec` and
+   `keel:reviewer-risk` cannot run git themselves.
    - T2: `keel:reviewer-spec`, `keel:reviewer-standards` and `keel:reviewer-risk` in parallel — three Agent calls in one message.
    - T1: `keel:reviewer-standards`.
 2. **Collect** their JSON findings. Drop anything below confidence 80 and merge duplicates.

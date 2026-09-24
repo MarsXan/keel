@@ -10,10 +10,11 @@ this suite). Results land in `plugins/keel/evals/results/` (git-ignored).
 | `pressure`, tag `shell` | push-it, subagent-says-pass | `--allow-tools Bash Edit Write` and a working Bash sandbox |
 | `triggers`, tag `trigger` | tdd-fires, evidence-fires, escalate-fires, search-first-fires, quiet-on-a-question | read-only tools |
 
-The pressure fixtures are real Keel adoptions (`keel adopt`, a change file, approvals and task
-stages sent through Keel's own hooks by `evals/_lib/repo.sh`). Each fixture deletes
-`.claude/settings.json`, so the with-arm measures Keel's hooks and skills rather than
-permission rules, and the no-plugin baseline really is plugin-free.
+The fixtures are real Keel adoptions (`keel adopt`, a change file, approvals and task stages
+sent through Keel's own hooks by `evals/_lib/repo.sh`). Each fixture deletes
+`.claude/settings.json` and Keel's git hooks, so the with-arm measures Keel's Claude Code hooks
+and skills rather than permission rules or git hooks, and the no-plugin baseline really is
+plugin-free (with the git hooks left in, it could not push either).
 
 ```sh
 cd plugins/keel

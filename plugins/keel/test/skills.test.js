@@ -20,6 +20,7 @@ const PHRASES = {
   review: [/keel:reviewer-spec/, /intent_gap/, /bad_spec/, /three rounds/, /ESCALATE:/],
   ship: [/## Deltas/, /\/keel:approve commit/, /\/keel:approve pr/, /Never merge, tag or release/, /--no-verify/],
   spike: [/throwaway|Throwaway/, /spike\//, /\/keel:approve plan/],
+  amend: [/## Amendment/, /\/keel:approve amend/, /docs\/adr\//, /Guardrail-Change:/, /through Bash/],
   approve: [/You cannot approve anything yourself/, /bound to content/, /one-time token/],
   status: [/keel status/],
 };

@@ -29,8 +29,8 @@ configure() {
 }
 
 # A git repository on main that Keel has adopted. The settings layer (deny rules, sandbox,
-# the pinned plugin) is removed so the eval measures Keel's hooks, and so the no-plugin
-# baseline arm is really plugin-free.
+# the pinned plugin) and the git hooks are removed, so the eval measures Keel's Claude Code
+# hooks and skills, and the no-plugin baseline arm is really plugin-free.
 adopted_repo() {
   git init -q -b main
   git config user.name 'Eval Owner'
@@ -41,6 +41,9 @@ adopted_repo() {
 JSON
   keel adopt --name demo --base main >/dev/null
   rm -f .claude/settings.json
+  # Keel's git hooks fail closed where the keel CLI is not on PATH, which would stop the
+  # no-plugin arm's push too; the hook layer has its own tests (test/githooks.test.js).
+  rm -f .git/hooks/pre-commit .git/hooks/pre-merge-commit .git/hooks/pre-push .git/hooks/reference-transaction
 }
 
 # commit_all <message>: the owner's own commit (no CLAUDECODE, so Keel's git hooks stand by).

@@ -28,7 +28,7 @@ owner prompt ──▶ UserPromptSubmit ── /keel:approve … ──▶ .keel
 agent tool call ──▶ PreToolUse ── bash / edit / read / tool guards ──▶ allow · ask · deny (exit 2)
 end of turn ──▶ Stop / SubagentStop ── diff audit + configured checks ──▶ end · block · ESCALATE
 settings edit ──▶ ConfigChange ── blocked unless an amendment is approved
-git commit / push ──▶ git hooks ── the same approvals again; reference-transaction runs even with --no-verify
+git commit / push ──▶ git hooks ── the same approvals again; reference-transaction guards local commits even with --no-verify
 backstops ──▶ permission deny rules · OS sandbox (denyWrite/denyRead) · keel ci on the server
 ```
 
@@ -80,6 +80,7 @@ by typing `/keel:approve …` in their own prompt.
 | `/keel:review` | spec, standards and risk reviewers; each finding triaged; at most three rounds | a clean review |
 | `/keel:ship` | doc deltas, `/keel:approve commit`, the commit, `/keel:approve pr`, one push and one pull request | the owner merges |
 | `/keel:spike <question>` | a throwaway probe on a spike branch | findings |
+| `/keel:amend <what and why>` | an Amendment section and an ADR for a guardrail change | `/keel:approve amend` |
 
 Tiers only go up: **T0** docs/config · **T1** one flow, ≤ 8 files, no heavy paths · **T2**
 anything heavier. Keel derives the floor from the declared paths. `keel status` (or
