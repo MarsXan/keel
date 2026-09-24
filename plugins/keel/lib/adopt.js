@@ -149,6 +149,12 @@ const list = (v) => (v === undefined ? undefined : v.split(',').map((x) => x.tri
 /** @type {import('./cli.js').Command} */
 export function adoptCommand(args, io) {
   const root = resolveRoot({ cwd: io.cwd }, io.env);
+  if (args.includes('--hooks')) {
+    const hooks = installGitHooks(root);
+    if (hooks.installed.length > 0) io.stdout.write(`installed: ${hooks.installed.map((h) => `.git/hooks/${h}`).join(', ')}\n`);
+    if (hooks.instructions) io.stdout.write(`note: git hooks: ${hooks.instructions}\n`);
+    return hooks.installed.length > 0 || !hooks.instructions ? 0 : 1;
+  }
   try {
     const r = adopt(root, {
       name: option(args, '--name'),

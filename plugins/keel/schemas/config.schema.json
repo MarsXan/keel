@@ -38,7 +38,7 @@
         "tests": { "$ref": "#/$defs/globs", "description": "Test files: editable only by the test-writer / in the red stage." },
         "heavy": { "$ref": "#/$defs/globs", "description": "Paths that force tier T2." },
         "critical": { "$ref": "#/$defs/globs", "description": "Paths under mutation testing." },
-        "protected": { "$ref": "#/$defs/globs", "description": "Guardrail files: change only through /keel:amend." },
+        "protected": { "$ref": "#/$defs/globs", "description": "Extra guardrail files, added to Keel's own (instruction files, Keel config and state, checker configs): they change only through /keel:amend." },
         "docs": { "$ref": "#/$defs/globs" },
         "secrets": { "$ref": "#/$defs/globs", "description": "Files the agent may never read (patterns may start with ~/)." },
         "secretsAllow": { "$ref": "#/$defs/globs", "description": "Exceptions to secrets, e.g. .env.example." }

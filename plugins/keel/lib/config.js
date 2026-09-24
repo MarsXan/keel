@@ -52,7 +52,12 @@ const DEFAULTS = {
     tests: ['**/*.test.*', '**/*.spec.*', '**/__tests__/**', '**/test_*.py', '**/*_test.py', '**/*_test.go'],
     heavy: [],
     critical: [],
-    protected: ['CLAUDE.md', 'CONSTITUTION.md', 'AGENTS.md', '.claude/**', '.keel/config.json', '.keel/baseline/**'],
+    protected: [
+      'CLAUDE.md', 'CONSTITUTION.md', 'AGENTS.md', '.claude/**', '.keel/config.json', '.keel/baseline/**',
+      // Checker configurations decide what "green" means.
+      '**/vitest.config.*', '**/vitest.workspace.*', '**/jest.config.*', '**/eslint.config.*', '**/.eslintrc*',
+      '**/.dependency-cruiser.*', '**/playwright.config.*', '**/.mocharc*', '**/biome.json', '**/biome.jsonc',
+    ],
     docs: ['docs/**'],
     secrets: [
       '.env', '.env.*', '*.pem', '*.key', 'id_rsa*', 'id_dsa*', 'id_ecdsa*', 'id_ed25519*', '*.p12', '*.pfx',
@@ -112,7 +117,10 @@ export function loadConfig(root) {
   }
   const errors = validateConfig(raw);
   if (errors.length > 0) return { config: DEFAULT_CONFIG, errors, path };
-  return { config: deepFreeze(merge(structuredClone(DEFAULTS), raw)), errors: [], path };
+  const config = merge(structuredClone(DEFAULTS), raw);
+  // Protection only adds up: a project lists extra protected paths, never fewer than Keel's.
+  config.paths.protected = [...new Set([...DEFAULTS.paths.protected, ...config.paths.protected])];
+  return { config: deepFreeze(config), errors: [], path };
 }
 
 /**

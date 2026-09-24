@@ -9,12 +9,14 @@ import { approvalsSection, parseChange, tasks, tierRank } from '../changefile.js
 import { matchAny } from '../glob.js';
 import { classifier, realPath, toRel } from '../paths.js';
 import { testEditProblem } from '../freeze.js';
+import { changedScripts, isManifest, scriptsMessage } from './scripts.js';
 import { amendApproved, planProblem } from './authority.js';
 import { afterContent, evaluateContent } from './content.js';
 import { ALLOW, ask, combine, deny } from './decision.js';
 import { READ_ONLY_ROLES } from './role-rules.js';
 
 const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+export const OTHER_WORKTREE = 'That path is in another worktree of this repository, outside the change Keel is gating. Work in this working tree.';
 
 /**
  * @typedef {import('./decision.js').Decision} Decision
@@ -29,6 +31,7 @@ const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
  * @property {() => string[]} approvedScopes
  * @property {() => Record<string, import('../freeze.js').Frozen>} [frozenTests] the change's frozen tests (trusted store)
  * @property {(rel: string) => string | null} readFile project-relative read; null when missing
+ * @property {(abs: string) => boolean} [inOtherWorktree] the path is inside another worktree of this repository
  */
 
 /**
@@ -43,7 +46,9 @@ export function evaluateEdit(input, ctx) {
   if (!raw) return deny('This edit has no file path, so Keel cannot check it.');
   const abs = resolve(ctx.root, raw.replace(/\\/g, '/'));
   const rels = [...new Set([toRel(ctx.root, abs), toRel(ctx.root, realPath(abs))])].filter((r) => r !== null);
-  if (rels.length === 0) return ALLOW;
+  if (rels.length === 0) {
+    return ctx.inOtherWorktree?.(abs) ? deny(OTHER_WORKTREE) : ALLOW;
+  }
   if (ctx.configErrors.length > 0) {
     return deny(`Keel's configuration is invalid, so edits are blocked until the owner fixes .keel/config.json:\n- ${ctx.configErrors.slice(0, 5).join('\n- ')}`);
   }
@@ -56,6 +61,8 @@ export function evaluateEdit(input, ctx) {
   const after = afterContent(input.tool_name ?? '', ti, before);
   const changeFile = changeFileRule(rel, before, after, ctx);
   if (changeFile) return changeFile;
+  const scripts = isManifest(rel) ? changedScripts(before, after) : [];
+  if (scripts.length > 0 && !amendApproved(ctx.change, ctx.isApproved)) return deny(scriptsMessage(rel, scripts));
   if (rels.some(c.isProtected)) {
     if (!amendApproved(ctx.change, ctx.isApproved)) {
       return deny(`${rel} is a protected guardrail file. It changes only through /keel:amend: describe the change in the active change file's Amendment section and ask the owner to type /keel:approve amend.`);
@@ -83,6 +90,7 @@ export function shellWriteRule(rel, role, ctx) {
   if (rel.startsWith(`${dir}/`) && rel.endsWith('.md')) {
     return deny('Change files are edited with the Edit tool, so Keel can check their Approvals section.');
   }
+  if (isManifest(rel)) return deny(`${rel} is edited with the Edit tool (or a package manager), so Keel can check its scripts.`);
   const c = classifier(ctx.root, ctx.config);
   const test = c.isTest(rel);
   const source = !test && c.isSource(rel);

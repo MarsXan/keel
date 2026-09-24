@@ -64,6 +64,11 @@ test('the spec artifact changes when the intent changes', () => {
   assert.notEqual(before, after);
 });
 
+test('a brace glob in a task keeps its commas', () => {
+  const t = tasks(parseChange('# C\n## Tasks\n- T-1 · files: src/**/*.{ts,tsx}, docs/a.md · done-when: npm test\n'));
+  assert.deepEqual(t[0].files, ['src/**/*.{ts,tsx}', 'docs/a.md']);
+});
+
 test('tasks parse ids, parallel flag, requirements, files and commands', () => {
   const t = tasks(parseChange(doc));
   assert.deepEqual(t, [

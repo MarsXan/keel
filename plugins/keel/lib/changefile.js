@@ -148,12 +148,21 @@ function parseReqs(head) {
   return reqs;
 }
 
-/** @param {string} s */
+/** Comma-separated items; commas inside braces belong to a glob ({ts,tsx}). @param {string} s */
 function splitList(s) {
-  return s
-    .split(',')
-    .map((x) => x.trim().replace(/^`|`$/g, ''))
-    .filter(Boolean);
+  const items = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}') depth = Math.max(0, depth - 1);
+    else if (s[i] === ',' && depth === 0) {
+      items.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  items.push(s.slice(start));
+  return items.map((x) => x.trim().replace(/^`|`$/g, '')).filter(Boolean);
 }
 
 /**

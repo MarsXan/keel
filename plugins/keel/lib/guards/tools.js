@@ -5,7 +5,7 @@ import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
 import { readdirSync } from 'node:fs';
-import { alias, currentBranch, filesUnder } from '../git.js';
+import { alias, currentBranch, filesUnder, otherWorktrees } from '../git.js';
 import { pushDestination } from '../git-history.js';
 import { context, ESCALATE_HINT, preToolUse } from '../io.js';
 import { classifier, toRel } from '../paths.js';
@@ -21,6 +21,16 @@ import { join, resolve } from 'node:path';
  * @typedef {import('../guards.js').GuardResult} GuardResult
  * @typedef {import('../policy/decision.js').Decision} Decision
  */
+
+/**
+ * Whether a path lies inside another worktree of the repository (looked up once, lazily).
+ * @param {string} root
+ */
+function inWorktreeOf(root) {
+  /** @type {string[] | undefined} */
+  let trees;
+  return (/** @type {string} */ abs) => (trees ??= otherWorktrees(root)).some((dir) => abs === dir || abs.startsWith(`${dir}/`));
+}
 
 /** @param {Decision} d @returns {GuardResult} */
 function answer(d) {
@@ -70,6 +80,7 @@ function bashGuard(input, ctx, env) {
     role,
     writeRule: (rel) => shellWriteRule(rel, role, (edits ??= editContext(ctx))),
     filesUnder: (rel) => filesUnder(ctx.root, rel),
+    inOtherWorktree: inWorktreeOf(ctx.root),
   });
   if (d.decision === 'allow') {
     const refused = recordTransitions(command, ctx);
@@ -100,6 +111,7 @@ function editContext(ctx) {
     isApproved,
     approvedScopes,
     frozenTests: () => frozenTests(ctx.root, changeId),
+    inOtherWorktree: inWorktreeOf(ctx.root),
     readFile: (rel) => readText(join(ctx.root, rel)),
   };
 }

@@ -14,6 +14,7 @@ import { tierFloor } from '../tiers.js';
 import { countAssertions, frozenFindings } from '../freeze.js';
 import { amendApproved, planProblem } from './authority.js';
 import { evaluateContent } from './content.js';
+import { changedScripts, isManifest, scriptsMessage } from './scripts.js';
 
 const MAX_TEXT = 2 * 1024 * 1024;
 
@@ -57,6 +58,8 @@ export function auditWorkingTree(root, opts) {
     const before = heads.get(f.path) ?? null;
     const content = evaluateContent(f.path, before, after, opts.config);
     if (!content.ok && content.reason) findings.push(content.reason);
+    const scripts = isManifest(f.path) ? changedScripts(before, after) : [];
+    if (scripts.length > 0 && !amendApproved(opts.change, opts.isApproved)) findings.push(scriptsMessage(f.path, scripts));
     if (c.isTest(f.path) && before !== null) {
       const was = countAssertions(before);
       const now = countAssertions(after);

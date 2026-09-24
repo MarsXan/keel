@@ -111,3 +111,10 @@ test('a diff heavier than its tier is a finding', () => {
   writeFileSync(join(dir, 'src/a/y.ts'), '2');
   assert.match(auditWorkingTree(dir, opts({ config: many })).findings.join('\n'), /2 source and test files/);
 });
+
+test('a package.json script changed by any route is a finding without an amendment', () => {
+  const dir = gitRepo({ files: { 'package.json': '{"scripts":{"test":"vitest run"}}\n' }, commit: true });
+  writeFileSync(join(dir, 'package.json'), '{"scripts":{"test":"node -e 0"}}\n');
+  assert.match(auditWorkingTree(dir, opts({ isApproved: (w) => w === 'plan' })).findings.join('\n'), /package\.json: changing the script test/);
+  assert.deepEqual(auditWorkingTree(dir, opts()).findings, [], 'an approved amendment covers it');
+});

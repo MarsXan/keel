@@ -32,6 +32,11 @@ test('file values override defaults and arrays replace', () => {
   assert.ok(config.paths.protected.includes('CLAUDE.md'));
 });
 
+test('protected paths only add up: a project cannot list fewer than the defaults', () => {
+  const { config } = loadConfig(projectWith({ keel: '0.1', paths: { protected: ['infra/**'] } }));
+  for (const p of ['infra/**', 'CLAUDE.md', '.keel/config.json', '**/vitest.config.*']) assert.ok(config.paths.protected.includes(p), p);
+});
+
 test('unknown keys and wrong types are errors; the defaults are returned', () => {
   const dir = projectWith({ keel: '0.1', bogus: 1, caps: { fileLines: 'x' }, paths: { sauce: [] } });
   const { config, errors } = loadConfig(dir);

@@ -45,6 +45,7 @@ import { removeRule } from './remove-rules.js';
  * @property {string} [role] agent_type of the caller ('' for the main session)
  * @property {(rel: string) => Decision | null} [writeRule] the Edit tool's path rules for a project path the command writes
  * @property {(rel: string) => string[]} [filesUnder] project files git keeps (tracked or not ignored) under a directory
+ * @property {(abs: string) => boolean} [inOtherWorktree] the path is inside another worktree of this repository
  * @typedef {{ commands: number, started: number, seen: Set<string> }} Budget
  * @typedef {BashContext & { classify: import('../paths.js').Classifier, cwdKnown: boolean, startCwd: string, depth: number, budget: Budget, shell: import('../shell-snapshot.js').ShellDefinitions, listDir: (abs: string) => string[] | null, expanding: Set<string> }} CommandContext
  */

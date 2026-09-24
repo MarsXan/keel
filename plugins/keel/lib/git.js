@@ -4,7 +4,7 @@
  * returns paths relative to the project root even when it sits below the git top level.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { sha256 } from './hash.js';
 
@@ -75,6 +75,30 @@ export function topLevel(cwd) {
 export function filesUnder(root, rel) {
   const out = run(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', rel || '.'], { allowFail: true });
   return out === null ? [] : [...new Set(out.split('\0').filter(Boolean))];
+}
+
+/**
+ * Top-level directories of this repository's other worktrees.
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function otherWorktrees(root) {
+  const top = topLevel(root);
+  const out = run(root, ['worktree', 'list', '--porcelain'], { allowFail: true }) ?? '';
+  return out
+    .split('\n')
+    .filter((l) => l.startsWith('worktree '))
+    .map((l) => real(l.slice(9)))
+    .filter((dir) => dir !== (top && real(top)));
+}
+
+/** @param {string} p */
+function real(p) {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
 }
 
 /** @param {string} root */

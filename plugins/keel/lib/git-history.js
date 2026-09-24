@@ -73,9 +73,13 @@ export function diffFiles(root, from, to) {
   return files;
 }
 
+/** Generated lockfiles: they do not count toward the pull-request size cap. */
+export const LOCKFILES = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'bun.lock', 'bun.lockb', 'Cargo.lock', 'poetry.lock', 'uv.lock', 'go.sum', 'composer.lock', 'Gemfile.lock'];
+
 /** Lines added plus removed between two revisions (binary files count as 0). @param {string} root @param {string} from @param {string} to */
 export function changedLines(root, from, to) {
-  const out = run(root, ['diff', '--numstat', '--relative', from, to], { allowFail: true }) ?? '';
+  const exclude = LOCKFILES.map((f) => `:(exclude,glob)**/${f}`);
+  const out = run(root, ['diff', '--numstat', '--relative', from, to, '--', '.', ...exclude], { allowFail: true }) ?? '';
   return out
     .split('\n')
     .filter(Boolean)

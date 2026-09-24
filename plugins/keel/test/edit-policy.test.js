@@ -136,3 +136,15 @@ test('heavy paths need a T2 change', () => {
   assert.match(evaluateEdit({ tool_name: 'Edit', tool_input: { file_path: '/p/src/a/domain/x.ts' } }, ctx({ config: heavy })).reason, /heavy path/);
   assert.equal(edit('/p/src/a/domain/x.ts', { config: heavy, change: change('T2'), isApproved: (w) => w === 'plan' || w === 'spec' }), 'allow');
 });
+
+test('package.json scripts and checker configs change only with an approved amendment', () => {
+  const pkg = '{"name":"x","scripts":{"test":"vitest run"}}';
+  const at = (content, over = {}) => write('/p/package.json', content, { readFile: () => pkg, ...over }).decision;
+  assert.equal(at('{"name":"x","scripts":{"test":"node -e 0"}}'), 'deny');
+  assert.equal(at('{"name":"x","scripts":{}}'), 'deny', 'removing a script counts');
+  assert.equal(at('{"name":"x","scripts":{"test":"vitest run","docs":"typedoc"}}'), 'allow', 'adding a script does not');
+  assert.equal(at('{"name":"x","scripts":{"test":"node -e 0"}}', { isApproved: () => true }), 'allow', 'an approved amendment allows it');
+  assert.match(write('/p/apps/api/package.json', '{"scripts":{}}', { readFile: () => pkg }).reason, /apps\/api\/package\.json: changing the script test/);
+  assert.equal(edit('/p/vitest.config.ts'), 'deny');
+  assert.equal(edit('/p/libs/a/eslint.config.mjs'), 'deny');
+});

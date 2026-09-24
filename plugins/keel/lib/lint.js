@@ -3,7 +3,7 @@
  * Change-file lint: the deterministic gate before the owner approves a spec or a plan, and
  * before verification is claimed. Every error says what to fix.
  */
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseChange, section, tasks, tierRank } from './changefile.js';
 import { buildContext, readText } from './context.js';
 import { globFloor } from './tiers.js';
@@ -134,7 +134,7 @@ export function lintCommand(args, io) {
     io.stderr.write('keel lint-change: no change file given and no active change.\n');
     return 64;
   }
-  const text = readText(join(ctx.root, rel));
+  const text = readText(resolve(ctx.root, rel));
   if (text === null) {
     io.stderr.write(`keel lint-change: cannot read ${rel}.\n`);
     return 1;

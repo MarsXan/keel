@@ -97,3 +97,10 @@ test('abandoned change files are not linted', () => {
   commit(dir);
   assert.deepEqual(ci(dir).failures, []);
 });
+
+test('lockfiles do not count toward the pull-request size cap', () => {
+  const dir = branch({ caps: { prLines: 3 } });
+  writeFiles(dir, { 'pnpm-lock.yaml': 'a\nb\nc\nd\ne\n', 'src/b.ts': 'x\n' });
+  commit(dir);
+  assert.deepEqual(ci(dir).failures, []);
+});
