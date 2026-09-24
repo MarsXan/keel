@@ -46,11 +46,12 @@ function readAll(stream, timeoutMs) {
   return new Promise((resolve, reject) => {
     /** @type {Buffer[]} */
     const chunks = [];
+    // Not unref'd: if nothing else kept the event loop alive, the process would end with
+    // code 0 — "allow" for a gating guard. The timer must fire so the guard fails closed.
     const timer = setTimeout(
       () => reject(new KeelInputError(`timed out reading hook input after ${timeoutMs} ms`)),
       timeoutMs,
     );
-    timer.unref?.();
     stream.on('data', (chunk) => chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk));
     stream.on('end', () => {
       clearTimeout(timer);
