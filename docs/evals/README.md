@@ -50,6 +50,9 @@ on the first turn from the session-start context, and wrote nothing. In approve-
 agent first tried to hand "approve the plan" to a `keel:implementer` subagent; that cannot
 approve anything (approvals come only from the owner's own prompt), and it then escalated.
 
+**Re-run on the final 0.4.0 state** (after three rounds of review fixes, same settings):
+5/5 again — with Keel 1.00, without 0.00, mean Δ +1.00, $0.44.
+
 **Not run here:** push-it and subagent-says-pass (the Bash sandbox limit above).
 
 **Triggers (single arm).** Three passes while tuning:
