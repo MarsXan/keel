@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — learning loop (unreleased)
+
+- **`keel audit [--metrics] [--json] [--strict]`**, the weekly drift report, read-only and
+  deterministic: paths named by instruction files and living docs that no longer exist, rule
+  files that load everywhere or grow past their cap, rule-like memory notes and long memory
+  indexes, lessons whose mechanism is gone, `keel doctor`'s findings, churn × size hotspots,
+  files over their caps, banned-pattern debt, and with `--metrics` the fix share per month,
+  change flow with first-pass review acceptance, and escalations and unverified turns.
+- **`/keel:audit`**: the report, judged by the read-only auditor against the repository, as
+  de-duplicated issue drafts for the owner.
+- **`/keel:lesson`**: a failure becomes the cheapest check that would have caught it plus at
+  most one rule line naming it, recorded in `docs/lessons/` where the audit keeps it honest.
+- **The amend flow, end to end**, and an audit of the fixture as Keel and the pack adopt it.
+- **The weekly audit guide** and a scheduled workflow template.
+
 ## 0.3.0 — keel-nestjs (unreleased)
 
 ### keel-nestjs, the first stack pack

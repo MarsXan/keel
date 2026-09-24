@@ -1,7 +1,7 @@
 // @ts-check
 /** keel-nestjs command-line interface: `keel-nestjs <command> [args]`. */
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 
 export const USAGE = `usage: keel-nestjs <command> [options]
 

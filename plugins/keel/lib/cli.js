@@ -1,7 +1,7 @@
 // @ts-check
 /** Keel command-line interface: `keel <command> [args]`. */
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 
 export const USAGE = `usage: keel <command> [options]
 

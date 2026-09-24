@@ -1,6 +1,6 @@
 {
   "name": "keel-nestjs-plugin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Keel stack pack for NestJS pnpm monorepos: templates, rules, canaries and the keel-nestjs CLI",
   "type": "module",

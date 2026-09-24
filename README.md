@@ -81,6 +81,8 @@ by typing `/keel:approve …` in their own prompt.
 | `/keel:ship` | doc deltas, `/keel:approve commit`, the commit, `/keel:approve pr`, one push and one pull request | the owner merges |
 | `/keel:spike <question>` | a throwaway probe on a spike branch | findings |
 | `/keel:amend <what and why>` | an Amendment section and an ADR for a guardrail change | `/keel:approve amend` |
+| `/keel:lesson <what went wrong>` | the cheapest check that would have caught it, recorded in `docs/lessons/` | the change that adds it |
+| `/keel:audit` | the weekly drift report, judged by the auditor, as issue drafts | the owner picks the issues |
 
 Tiers only go up: **T0** docs/config · **T1** one flow, ≤ 8 files, no heavy paths · **T2**
 anything heavier. Keel derives the floor from the declared paths. `keel status` (or
@@ -144,6 +146,7 @@ workflow. Install it with `claude plugin install keel-nestjs@keel`, then run
 | `keel check [--stage stop\|ci]` | the diff audit and the configured checks on changed files |
 | `keel diff-audit` | the diff audit alone |
 | `keel ci [--base ref]` | the server-side gate for a branch |
+| `keel audit [--metrics] [--json] [--strict]` | the weekly drift report: stale knowledge, harness, hotspots, debt, rework and flow |
 | `keel doctor [--quick]` | audit the harness: config, constitution, settings, permissions, git hooks |
 | `keel adopt [--name --base --protected --github --source --packages]` | write the project layer and install the git hooks |
 | `keel git-hook <hook>` | git hook entry point (installed by adopt) |
@@ -165,9 +168,11 @@ them and the latest results are in [`docs/evals/README.md`](docs/evals/README.md
 - **0.1 guards first** — hooks, approvals, bash/edit/content policies, the stop gate.
 - **0.2 workflow** — the workflow commands, the nine agents, change-file lint, tier floors,
   task stages and the test freeze, git hooks, ledger handoffs, `keel ci`, evals.
-- **0.3 keel-nestjs** — this release: configs proven by canaries, path-scoped rules and
-  scaffolding for clean-architecture NestJS pnpm monorepos.
-- **0.4 learning loop** — audit, lessons that become checks, amendments, metrics.
+- **0.3 keel-nestjs** — configs proven by canaries, path-scoped rules and scaffolding for
+  clean-architecture NestJS pnpm monorepos.
+- **0.4 learning loop** — this release: `keel audit` and `/keel:audit`, lessons that become
+  checks, the amend flow proven end to end, the weekly audit guide
+  ([`docs/guides/weekly-audit.md`](docs/guides/weekly-audit.md)).
 
 The design lives in [`docs/specs/2026-09-24-keel-design.md`](docs/specs/2026-09-24-keel-design.md).
 

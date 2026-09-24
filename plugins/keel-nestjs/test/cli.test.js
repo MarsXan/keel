@@ -15,7 +15,7 @@ test('keel-nestjs --version matches every manifest', async () => {
 });
 
 test('the pack depends on keel', () => {
-  assert.deepEqual(read('../.claude-plugin/plugin.json').dependencies, [{ name: 'keel', version: '^0.3.0' }]);
+  assert.deepEqual(read('../.claude-plugin/plugin.json').dependencies, [{ name: 'keel', version: '^0.4.0' }]);
 });
 
 test('unknown commands print usage and exit 64', async () => {
