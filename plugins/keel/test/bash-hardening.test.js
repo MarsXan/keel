@@ -210,3 +210,14 @@ test('zsh precommand modifiers and =cmd expansion do not hide the command', () =
   }
   assert.equal(decide('noglob ls *.ts'), 'allow');
 });
+
+test('read-only roles may run checks but never change the repository', () => {
+  const role = { role: 'keel:reviewer-standards' };
+  for (const c of ['pnpm test', 'git diff main', 'git log --oneline', 'keel check', 'npx eslint src', 'cat src/a.ts', 'ls 2>/dev/null']) {
+    assert.equal(decide(c, role), 'allow', c);
+  }
+  for (const c of ['rm src/a.ts', 'git checkout -- src', 'git add .', 'echo x > notes.md', 'sed -i s/a/b/ src/a.ts', 'mv a b', 'pnpm add left-pad', 'keel task T-1 green', 'git stash']) {
+    assert.equal(decide(c, role), 'deny', c);
+  }
+  assert.equal(decide('rm notes.md', { role: 'keel:implementer' }), 'allow', 'workers are not read-only');
+});

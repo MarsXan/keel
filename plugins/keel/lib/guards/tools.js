@@ -62,6 +62,7 @@ function bashGuard(input, ctx, env) {
       }
     },
     shell: loadShellSnapshot(ctx.home, env),
+    role: typeof input.agent_type === 'string' ? input.agent_type : '',
   });
   if (d.decision === 'allow') {
     const refused = recordTransitions(command, ctx);

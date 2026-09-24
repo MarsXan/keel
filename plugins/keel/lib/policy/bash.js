@@ -15,6 +15,7 @@ import { guardedWrite, isWriteCommand, outwardRule, removeRule, secretRule, writ
 import { combine, deny } from './decision.js';
 import { ghRule } from './gh-rules.js';
 import { gitRule } from './git-rules.js';
+import { roleRule } from './role-rules.js';
 import { findRule, interpreterRule, packageScriptRule, scriptRule, xargsRule } from './script-rules.js';
 import { claudeRule, declareRule, definitionRule, envProblem, keelRule, privilegeRule } from './session-rules.js';
 
@@ -40,6 +41,7 @@ import { claudeRule, declareRule, definitionRule, envProblem, keelRule, privileg
  * @property {number} [depth]
  * @property {Budget} [budget]
  * @property {Set<string>} [expanding] aliases being expanded (stops alias loops)
+ * @property {string} [role] agent_type of the caller ('' for the main session)
  * @typedef {{ commands: number, started: number, seen: Set<string> }} Budget
  * @typedef {BashContext & { classify: import('../paths.js').Classifier, cwdKnown: boolean, startCwd: string, depth: number, budget: Budget, shell: import('../shell-snapshot.js').ShellDefinitions, listDir: (abs: string) => string[] | null, expanding: Set<string> }} CommandContext
  */
@@ -153,6 +155,7 @@ function evaluateCommand(cmd, ctx) {
   const shadow = exported ? shadowProblem(exported.slice(5).split(':'), ctx) : shadowOf(c, argv0, name, ctx);
   if (shadow) return deny(shadow);
   return combine([
+    roleRule(c, name, ctx.role ?? ''),
     declareRule(c, name),
     definitionRule(c, name),
     keelRule(c, name, ctx),

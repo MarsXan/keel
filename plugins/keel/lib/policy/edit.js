@@ -11,9 +11,9 @@ import { classifier, realPath, toRel } from '../paths.js';
 import { amendApproved, planProblem } from './authority.js';
 import { afterContent, evaluateContent } from './content.js';
 import { ALLOW, ask, combine, deny } from './decision.js';
+import { READ_ONLY_ROLES } from './role-rules.js';
 
 const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
-const READ_ONLY_ROLES = new Set(['keel:explorer', 'keel:planner', 'keel:verifier', 'keel:reviewer-spec', 'keel:reviewer-standards', 'keel:reviewer-risk', 'keel:auditor']);
 
 /**
  * @typedef {import('./decision.js').Decision} Decision
