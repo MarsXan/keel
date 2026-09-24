@@ -10,6 +10,8 @@ import { changedFiles, headContents, hiddenFiles } from '../git.js';
 import { matchAny } from '../glob.js';
 import { sha256 } from '../hash.js';
 import { classifier } from '../paths.js';
+import { tierRank } from '../changefile.js';
+import { tierFloor } from '../tiers.js';
 import { amendApproved, planProblem } from './authority.js';
 import { evaluateContent } from './content.js';
 
@@ -73,6 +75,12 @@ export function auditWorkingTree(root, opts) {
   if (gated.length > 0) {
     const problem = planProblem(opts.change, opts.isApproved);
     if (problem) findings.push(`source or tests changed without an approved plan (${list(gated)}). ${problem}`);
+  }
+  if (opts.change && gated.length > 0) {
+    const floor = tierFloor(changed.map((f) => f.path), opts.config);
+    if (tierRank(floor.tier) > tierRank(opts.change.tier)) {
+      findings.push(`this diff needs tier ${floor.tier} (${floor.reasons.join('; ')}) but ${opts.change.id} is ${opts.change.tier}: raise the tier and get it approved, or split the change.`);
+    }
   }
   const hidden = hiddenFiles(root);
   if (hidden.length > 0) {

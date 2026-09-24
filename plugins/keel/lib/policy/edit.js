@@ -100,6 +100,9 @@ function planGate(rel, test, ctx) {
   const problem = planProblem(ctx.change, ctx.isApproved);
   if (problem) return deny(problem);
   const ch = /** @type {ActiveChange} */ (ctx.change);
+  if (tierRank(ch.tier) < 2 && matchAny(rel, ctx.config.paths.heavy)) {
+    return deny(`${rel} is a heavy path, so it needs a T2 change: raise the tier in ${ch.rel} (tiers only go up) and get the spec and plan approved.`);
+  }
   const scopes = ctx.approvedScopes();
   const task = ctx.current.task;
   if (test && task && task.stage !== 'red' && !scopes.includes('tests')) {

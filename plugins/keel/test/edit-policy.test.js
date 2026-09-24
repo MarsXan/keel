@@ -121,3 +121,10 @@ test('content policy applies to approved source edits', () => {
   assert.equal(write('/p/src/a/x.ts', 'l\n'.repeat(25)).decision, 'deny');
   assert.equal(write('/p/src/a/x.ts', 'const a = 1;\n').decision, 'allow');
 });
+
+test('heavy paths need a T2 change', () => {
+  const heavy = { ...config, paths: { ...config.paths, heavy: ['src/a/domain/**'] } };
+  assert.equal(edit('/p/src/a/domain/x.ts', { config: heavy }), 'deny');
+  assert.match(evaluateEdit({ tool_name: 'Edit', tool_input: { file_path: '/p/src/a/domain/x.ts' } }, ctx({ config: heavy })).reason, /heavy path/);
+  assert.equal(edit('/p/src/a/domain/x.ts', { config: heavy, change: change('T2'), isApproved: (w) => w === 'plan' || w === 'spec' }), 'allow');
+});
