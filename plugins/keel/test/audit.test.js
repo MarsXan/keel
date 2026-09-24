@@ -13,7 +13,7 @@ test('references: code spans that look like paths and relative links, nothing el
   const md = [
     'See `docs/guide.md`, `src/a.ts:12` and [the plan](../plans/p.md#top).',
     'Not paths: `src/**/*.ts`, `docs/changes/<id>.md`, `node:test`, `@nestjs/common`, `--force`, `keel use`,',
-    '[site](https://example.com/x.md), [anchor](#section), `a/b`, `pnpm-lock.yaml`.',
+    '[site](https://example.com/x.md), [anchor](#section), `a/b`, `pnpm-lock.yaml`, `domain/`, `dist/`.',
     '```',
     'import x from "./not/checked.ts";',
     '`inside/fence.md`',

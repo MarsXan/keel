@@ -11,7 +11,7 @@ the constructor; the context's module wires it with a factory.
 - **Depend on the domain and on ports only** — never on `infrastructure/`, `interface/` or
   the module (`application-no-outer-layers`).
 - **Other contexts** are reached only through their package (`@scope/<context>`), which
-  exports its public API from `src/index.ts`, or through events
+  exports its public API from `libs/<context>/src/index.ts`, or through events
   (`no-cross-context-internals`). A deep import into another package does not resolve
   (`not-to-unresolvable`).
 - **Transactions:** a command that writes more than one aggregate, or writes and publishes,

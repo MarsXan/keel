@@ -139,3 +139,29 @@ test('T2: heavy paths raise the tier, the spec gates the plan, and edits void ap
   assert.equal(edited.code, 0, edited.stderr);
   assert.match((await s.write(files, 'ALTER TABLE users ADD COLUMN nick text;\n')).stderr, /spec of 2-nickname is not approved, or changed after approval/);
 });
+
+test('amend: a guardrail change needs the owner, stays voidable, and CI wants its ADR', async () => {
+  const { dir } = await project('chore/3-lint-rule');
+  const s = session(dir);
+  const claudeMd = readFileSync(join(dir, 'CLAUDE.md'), 'utf8');
+  const amended = `${claudeMd}\n- Gotcha: run pnpm -s arch before a pull request.\n`;
+  const text = `${change(dir, '3-lint-rule', 'T1', 'src/placeholder.ts')}\n## Amendment\n- CLAUDE.md: add the gotcha line about pnpm -s arch.\n`;
+  assert.equal((await s.write('docs/changes/3-lint-rule.md', text)).code, 0);
+  assert.equal((await s.keel('use', '3-lint-rule')).code, 0);
+  assert.match((await s.write('CLAUDE.md', amended)).stderr, /protected guardrail file[\s\S]*\/keel:approve amend/);
+  assert.match((await s.owner('/keel:approve amend')).stdout, /amend approved/);
+  assert.equal((await s.write('CLAUDE.md', amended)).code, 0);
+  assert.doesNotMatch((await s.stop('CLAUDE.md amended as approved.')).stdout, /"block"/);
+
+  const current = readFileSync(join(dir, 'docs/changes/3-lint-rule.md'), 'utf8');
+  assert.equal((await s.write('docs/changes/3-lint-rule.md', current.replace('the gotcha line', 'two gotcha lines'))).code, 0);
+  assert.match((await s.write('CLAUDE.md', `${amended}- Another line.\n`)).stderr, /protected guardrail file/, 'editing the Amendment voids the approval');
+
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-qm', 'docs: add the arch gotcha']);
+  assert.match((await s.keel('ci', '--base', 'main')).stdout, /guardrail files changed \(CLAUDE\.md\)[\s\S]*FAIL/);
+  writeFileSync(join(dir, 'docs/adr/0002-arch-gotcha.md'), '# 2. Tell agents to run the architecture check\n');
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-qm', 'docs: record the decision']);
+  assert.match((await s.keel('ci', '--base', 'main')).stdout, /keel ci: PASS/);
+});

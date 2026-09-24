@@ -48,9 +48,13 @@ export function references(text) {
   return out;
 }
 
-/** @param {string} t */
+/**
+ * A path has a directory part: `domain/` or `dist/` alone names a kind of folder, not a
+ * place in this repository.
+ * @param {string} t
+ */
 function looksLikePath(t) {
-  if (/^[a-z][\w+.-]*:/i.test(t) || /[*?[\]{}<>$|,;=()'"]/.test(t) || /^[-@~]/.test(t) || !t.includes('/')) return false;
+  if (/^[a-z][\w+.-]*:/i.test(t) || /[*?[\]{}<>$|,;=()'"]/.test(t) || /^[-@~]/.test(t) || !t.replace(/\/+$/, '').includes('/')) return false;
   const last = t.replace(/\/+$/, '').split('/').pop() ?? '';
   return t.endsWith('/') || /\.[A-Za-z0-9]{1,8}$/.test(last);
 }
