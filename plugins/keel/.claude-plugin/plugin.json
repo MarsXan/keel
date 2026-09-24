@@ -1,0 +1,8 @@
+{
+  "name": "keel",
+  "version": "0.1.0",
+  "description": "Tiered, human-gated agentic workflow with deterministic, fail-closed guardrails",
+  "author": { "name": "Mohsen" },
+  "license": "MIT",
+  "keywords": ["guardrails", "workflow", "tdd", "hooks", "approvals", "clean-architecture"]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "keel",
+  "description": "Keel: a guardrailed agentic-coding harness for Claude Code",
+  "owner": { "name": "Mohsen" },
+  "plugins": [
+    {
+      "name": "keel",
+      "description": "Tiered, human-gated agentic workflow with deterministic, fail-closed guardrails",
+      "version": "0.1.0",
+      "category": "development",
+      "source": "./plugins/keel"
+    }
+  ]
+}

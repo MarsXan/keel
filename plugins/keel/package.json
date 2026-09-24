@@ -1,0 +1,9 @@
+{
+  "name": "keel-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Keel core plugin: the keel CLI, hooks, skills and templates",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "keel": "bin/keel" }
+}

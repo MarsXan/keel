@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+// Keel CLI launcher.
+//
+// Claude Code treats only exit code 2 as "block"; every other failure lets the action
+// through. So any failure while a gating guard runs — even a module that fails to load —
+// must end in exit code 2 here. Advisory events exit 1 instead: exit 2 there would block
+// the owner's prompt or a compaction rather than an agent action.
+const ADVISORY = new Set(['prompt', 'session-start', 'session-end', 'pre-compact', 'subagent-start', 'post-edit']);
+const args = process.argv.slice(2);
+const failClosed = args[0] === 'guard' && !ADVISORY.has(args[1] ?? '');
+
+function exit(code) {
+  process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));
+}
+
+import('../lib/cli.js')
+  .then((cli) => cli.main(args))
+  .then((code) => exit(code))
+  .catch((err) => {
+    const detail = (err && err.stack) || String(err);
+    process.stderr.write(`keel: internal error${failClosed ? ' — failing closed' : ''}: ${detail}\n`);
+    exit(failClosed ? 2 : 1);
+  });
