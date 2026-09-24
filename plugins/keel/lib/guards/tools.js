@@ -11,7 +11,7 @@ import { context, ESCALATE_HINT, preToolUse } from '../io.js';
 import { classifier, toRel } from '../paths.js';
 import { evaluateBash } from '../policy/bash.js';
 import { packagesOf } from '../policy/diffaudit.js';
-import { evaluateEdit } from '../policy/edit.js';
+import { evaluateEdit, shellWriteRule } from '../policy/edit.js';
 import { loadShellSnapshot } from '../shell-snapshot.js';
 import { recordTransitions, taskState } from '../tasks.js';
 import { join, resolve } from 'node:path';
@@ -40,6 +40,9 @@ function bashGuard(input, ctx, env) {
   /** @type {string | undefined} */
   let branch;
   const branchState = () => (branch ??= branchHash(ctx.root, base));
+  const role = typeof input.agent_type === 'string' ? input.agent_type : '';
+  /** @type {import('../policy/edit.js').EditContext | undefined} */
+  let edits;
   const d = evaluateBash(command, {
     root: ctx.root,
     cwd: typeof input.cwd === 'string' && input.cwd ? input.cwd : ctx.root,
@@ -62,7 +65,8 @@ function bashGuard(input, ctx, env) {
       }
     },
     shell: loadShellSnapshot(ctx.home, env),
-    role: typeof input.agent_type === 'string' ? input.agent_type : '',
+    role,
+    writeRule: (rel) => shellWriteRule(rel, role, (edits ??= editContext(ctx))),
   });
   if (d.decision === 'allow') {
     const refused = recordTransitions(command, ctx);
@@ -74,22 +78,26 @@ function bashGuard(input, ctx, env) {
 
 /** @type {Guard} */
 function editGuard(input, ctx) {
+  return answer(evaluateEdit({ tool_name: input.tool_name, tool_input: input.tool_input, agent_type: input.agent_type }, editContext(ctx)));
+}
+
+/**
+ * The edit policy's view of the project, with the task stage read from the trusted store.
+ * @param {import('../context.js').GuardContext} ctx
+ * @returns {import('../policy/edit.js').EditContext}
+ */
+function editContext(ctx) {
   const { isApproved, approvedScopes } = approvalQueries(ctx);
-  return answer(
-    evaluateEdit(
-      { tool_name: input.tool_name, tool_input: input.tool_input, agent_type: input.agent_type },
-      {
-        root: ctx.root,
-        config: ctx.config,
-        configErrors: ctx.configErrors,
-        current: { ...ctx.current, task: taskState(ctx.root, ctx.change?.id ?? null).current },
-        change: ctx.change,
-        isApproved,
-        approvedScopes,
-        readFile: (rel) => readText(join(ctx.root, rel)),
-      },
-    ),
-  );
+  return {
+    root: ctx.root,
+    config: ctx.config,
+    configErrors: ctx.configErrors,
+    current: { ...ctx.current, task: taskState(ctx.root, ctx.change?.id ?? null).current },
+    change: ctx.change,
+    isApproved,
+    approvedScopes,
+    readFile: (rel) => readText(join(ctx.root, rel)),
+  };
 }
 
 /**

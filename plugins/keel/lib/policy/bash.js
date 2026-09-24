@@ -42,6 +42,7 @@ import { claudeRule, declareRule, definitionRule, envProblem, keelRule, privileg
  * @property {Budget} [budget]
  * @property {Set<string>} [expanding] aliases being expanded (stops alias loops)
  * @property {string} [role] agent_type of the caller ('' for the main session)
+ * @property {(rel: string) => Decision | null} [writeRule] the Edit tool's path rules for a project path the command writes
  * @typedef {{ commands: number, started: number, seen: Set<string> }} Budget
  * @typedef {BashContext & { classify: import('../paths.js').Classifier, cwdKnown: boolean, startCwd: string, depth: number, budget: Budget, shell: import('../shell-snapshot.js').ShellDefinitions, listDir: (abs: string) => string[] | null, expanding: Set<string> }} CommandContext
  */

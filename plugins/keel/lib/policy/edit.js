@@ -62,11 +62,44 @@ export function evaluateEdit(input, ctx) {
   }
   const test = rels.some(c.isTest);
   const source = !test && rels.some(c.isSource);
+  const author = authorRule(role, test, source);
+  if (author) return author;
+  return combine([test || source ? planGate(rel, test, ctx) : null, contentDecision(rel, before, after, ctx)]);
+}
+
+/**
+ * The path rules for a write Keel cannot see the content of, such as `sed -i` or a redirect:
+ * source and tests meet the same role and plan gates as the Edit tool, and change files are
+ * edited only with the Edit tool so their Approvals section can be checked.
+ * @param {string} rel project-relative path
+ * @param {string} role agent_type of the caller ('' for the main session)
+ * @param {EditContext} ctx
+ * @returns {Decision | null}
+ */
+export function shellWriteRule(rel, role, ctx) {
+  const dir = ctx.config.paths.changes.replace(/\/+$/, '');
+  if (rel.startsWith(`${dir}/`) && rel.endsWith('.md')) {
+    return deny('Change files are edited with the Edit tool, so Keel can check their Approvals section.');
+  }
+  const c = classifier(ctx.root, ctx.config);
+  const test = c.isTest(rel);
+  const source = !test && c.isSource(rel);
+  return authorRule(role, test, source) ?? (test || source ? planGate(rel, test, ctx) : null);
+}
+
+/**
+ * The build roles split authorship: the test-writer writes tests, the implementer code.
+ * @param {string} role
+ * @param {boolean} test
+ * @param {boolean} source
+ * @returns {Decision | null}
+ */
+function authorRule(role, test, source) {
   if (role === 'keel:test-writer' && source) return deny('The test-writer edits tests only; production code belongs to the implementer.');
   if (role === 'keel:implementer' && test) {
     return deny('The implementer may not edit tests. If a test is wrong, stop and reply with a line starting "ESCALATE:" explaining why.');
   }
-  return combine([test || source ? planGate(rel, test, ctx) : null, contentDecision(rel, before, after, ctx)]);
+  return null;
 }
 
 /**

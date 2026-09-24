@@ -54,6 +54,8 @@ export function removeRule(cmd, ctx) {
     if (rel !== null && (ctx.classify.touchesProtected(rel) || rel === '.git' || rel.startsWith('.git/'))) {
       return deny(`Deleting ${word} would remove a protected Keel path or git's own data.`);
     }
+    const gated = rel !== null ? pathGate(rel, ctx, `rm ${word} would delete ${rel}`) : null;
+    if (gated) return gated;
     if (recursive && rel === null && !TEMP.some((p) => `${abs}/`.startsWith(p))) {
       return deny(`Recursive delete outside the project (${word}) is not allowed.`);
     }
@@ -162,6 +164,8 @@ function inlineEditFiles(argv) {
  * @param {string} how e.g. "cp", "redirect"
  */
 export function guardedWrite(targets, ctx, how) {
+  /** @type {Decision | null} */
+  let asked = null;
   for (const t of targets) {
     if (!t || t === '/dev/null' || t.startsWith('/dev/std') || t === '/dev/tty') continue;
     for (const abs of candidatePaths(t, ctx)) {
@@ -173,9 +177,24 @@ export function guardedWrite(targets, ctx, how) {
       if (rel !== null && ctx.classify.touchesProtected(rel)) {
         return deny(`${how} would write ${t}, a protected Keel path. Guardrail files change only through /keel:amend (Edit tool, owner approval); Keel state is written only by Keel.`);
       }
+      const gated = rel !== null ? pathGate(rel, ctx, `${how} would write ${t}`) : null;
+      if (gated?.decision === 'deny') return gated;
+      asked ??= gated;
     }
   }
-  return null;
+  return asked;
+}
+
+/**
+ * The Edit tool's path rules for a project path a command writes or deletes.
+ * @param {string} rel
+ * @param {CommandContext} ctx
+ * @param {string} what how the path is written, for the message
+ * @returns {Decision | null}
+ */
+function pathGate(rel, ctx, what) {
+  const d = ctx.writeRule?.(rel) ?? null;
+  return d && d.decision !== 'allow' ? { decision: d.decision, reason: `${what}. ${d.reason}` } : null;
 }
 
 /** @param {string} t @param {CommandContext} ctx */
