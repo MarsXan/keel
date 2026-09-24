@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { approvalsSection, parseChange, tasks, tierRank } from '../changefile.js';
 import { matchAny } from '../glob.js';
 import { classifier, realPath, toRel } from '../paths.js';
+import { testEditProblem } from '../freeze.js';
 import { amendApproved, planProblem } from './authority.js';
 import { afterContent, evaluateContent } from './content.js';
 import { ALLOW, ask, combine, deny } from './decision.js';
@@ -26,6 +27,7 @@ const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
  * @property {ActiveChange | null} change
  * @property {(what: string, hash: string) => boolean} isApproved
  * @property {() => string[]} approvedScopes
+ * @property {() => Record<string, import('../freeze.js').Frozen>} [frozenTests] the change's frozen tests (trusted store)
  * @property {(rel: string) => string | null} readFile project-relative read; null when missing
  */
 
@@ -64,7 +66,7 @@ export function evaluateEdit(input, ctx) {
   const source = !test && rels.some(c.isSource);
   const author = authorRule(role, test, source);
   if (author) return author;
-  return combine([test || source ? planGate(rel, test, ctx) : null, contentDecision(rel, before, after, ctx)]);
+  return combine([test || source ? planGate(rel, test, after, ctx) : null, contentDecision(rel, before, after, ctx)]);
 }
 
 /**
@@ -84,7 +86,7 @@ export function shellWriteRule(rel, role, ctx) {
   const c = classifier(ctx.root, ctx.config);
   const test = c.isTest(rel);
   const source = !test && c.isSource(rel);
-  return authorRule(role, test, source) ?? (test || source ? planGate(rel, test, ctx) : null);
+  return authorRule(role, test, source) ?? (test || source ? planGate(rel, test, null, ctx) : null);
 }
 
 /**
@@ -126,10 +128,11 @@ function changeFileRule(rel, before, after, ctx) {
 /**
  * @param {string} rel
  * @param {boolean} test
+ * @param {string | null} after content after the edit; null for a shell write Keel cannot read
  * @param {EditContext} ctx
  * @returns {Decision | null}
  */
-function planGate(rel, test, ctx) {
+function planGate(rel, test, after, ctx) {
   const problem = planProblem(ctx.change, ctx.isApproved);
   if (problem) return deny(problem);
   const ch = /** @type {ActiveChange} */ (ctx.change);
@@ -137,9 +140,9 @@ function planGate(rel, test, ctx) {
     return deny(`${rel} is a heavy path, so it needs a T2 change: raise the tier in ${ch.rel} (tiers only go up) and get the spec and plan approved.`);
   }
   const scopes = ctx.approvedScopes();
-  const task = ctx.current.task;
-  if (test && task && task.stage !== 'red' && !scopes.includes('tests')) {
-    return deny(`Tests are frozen while task ${task.id} is "${task.stage}"; they are written in the red stage. If a test is wrong, reply with a line starting "ESCALATE:" explaining why.`);
+  if (test && !scopes.includes('tests')) {
+    const problem = testEditProblem({ rel, task: ctx.current.task, frozen: ctx.frozenTests?.()[rel], after });
+    if (problem) return deny(problem);
   }
   const declared = tasks(ch.parsed).flatMap((t) => t.files);
   if (!matchAny(rel, [...declared, ...scopes.filter((s) => s !== 'tests')])) {

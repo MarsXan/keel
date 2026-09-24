@@ -23,7 +23,7 @@ export function stopGuard(input, ctx) {
   const role = typeof input.agent_type === 'string' ? input.agent_type : '';
   if (input.hook_event_name === 'SubagentStop' && !GATED_SUBAGENTS.has(role)) return { code: 0 };
   if (!isRepo(ctx.root)) return { code: 0 };
-  const { changeId, isApproved } = approvalQueries(ctx);
+  const { changeId, isApproved, approvedScopes } = approvalQueries(ctx);
   if (ctx.configErrors.length > 0) {
     return {
       code: 0,
@@ -31,9 +31,9 @@ export function stopGuard(input, ctx) {
     };
   }
   const task = taskState(ctx.root, changeId).current;
-  const frozen = task?.stage === 'red' ? {} : frozenTests(ctx.root, changeId);
+  const frozen = approvedScopes().includes('tests') ? {} : frozenTests(ctx.root, changeId);
   const d = evaluateStop(input, {
-    audit: () => auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen }),
+    audit: () => auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen, redStage: task?.stage === 'red' }),
     diffHash: () => worktreeFingerprint(ctx.root),
     runChecks: (files, packages) => runChecks(ctx.root, ctx.config, 'stop', { files, packages }),
     current: { lastGreen: lastGreen(ctx.root)?.hash ?? null },

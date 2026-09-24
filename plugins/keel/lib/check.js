@@ -32,9 +32,10 @@ function context(io) {
 
 /** @param {GuardContext} ctx */
 function audit(ctx) {
-  const { changeId, isApproved } = approvalQueries(ctx);
-  const frozen = taskState(ctx.root, changeId).current?.stage === 'red' ? {} : frozenTests(ctx.root, changeId);
-  return auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen });
+  const { changeId, isApproved, approvedScopes } = approvalQueries(ctx);
+  const frozen = approvedScopes().includes('tests') ? {} : frozenTests(ctx.root, changeId);
+  const redStage = taskState(ctx.root, changeId).current?.stage === 'red';
+  return auditWorkingTree(ctx.root, { config: ctx.config, change: ctx.change, isApproved, frozenTests: frozen, redStage });
 }
 
 /** @param {Io} io @param {string[]} findings */

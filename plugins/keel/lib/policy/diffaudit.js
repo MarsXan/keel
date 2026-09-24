@@ -8,22 +8,22 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { changedFiles, headContents, hiddenFiles } from '../git.js';
 import { matchAny } from '../glob.js';
-import { sha256 } from '../hash.js';
 import { classifier } from '../paths.js';
 import { tierRank } from '../changefile.js';
 import { tierFloor } from '../tiers.js';
+import { countAssertions, frozenFindings } from '../freeze.js';
 import { amendApproved, planProblem } from './authority.js';
 import { evaluateContent } from './content.js';
 
 const MAX_TEXT = 2 * 1024 * 1024;
-const ASSERTION = /\b(?:expect|assert|should)\b\s*(?:\.\s*[\w$]+\s*)*\(|\.should\./g;
 
 /**
  * @typedef {object} AuditOptions
  * @property {import('../config.js').KeelConfig} config
  * @property {import('./edit.js').ActiveChange | null} change
  * @property {(what: string, hash: string) => boolean} isApproved
- * @property {Record<string, string>} [frozenTests] test path → sha256 recorded when its task left red
+ * @property {Record<string, import('../freeze.js').Frozen | string>} [frozenTests] tests frozen when their task turned green ({} once the owner lifted the freeze)
+ * @property {boolean} [redStage] a task is in its red stage (frozen tests may grow, not shrink)
  * @typedef {object} AuditResult
  * @property {string[]} findings
  * @property {string[]} changed every changed path, deleted ones included
@@ -63,12 +63,7 @@ export function auditWorkingTree(root, opts) {
       if (now < was) findings.push(`fewer assertions in ${f.path} (${was} → ${now}); tests may not be weakened`);
     }
   }
-  for (const [rel, hash] of Object.entries(opts.frozenTests ?? {})) {
-    const now = readText(join(root, rel));
-    if (now === null || sha256(now) !== hash) {
-      findings.push(`frozen test changed: ${rel} was fixed when its task left the red stage; the owner can allow changes with /keel:approve scope tests`);
-    }
-  }
+  findings.push(...frozenFindings(root, opts.frozenTests ?? {}, { red: Boolean(opts.redStage) }));
   if (guarded.length > 0 && !amendApproved(opts.change, opts.isApproved)) {
     findings.push(`protected files changed without an approved amendment: ${list(guarded)}. Restore them, or run /keel:amend.`);
   }
@@ -114,10 +109,7 @@ function readText(abs) {
   }
 }
 
-/** Number of assertion calls (`expect(`, `assert.x(`, `should`). @param {string} text */
-export function countAssertions(text) {
-  return (text.match(ASSERTION) ?? []).length;
-}
+export { countAssertions };
 
 /**
  * Package directories (matching `packages` globs) that contain the given paths.

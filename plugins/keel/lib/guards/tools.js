@@ -1,6 +1,6 @@
 // @ts-check
 /** PreToolUse and PostToolUse guards: Bash, file edits, prompt-submitting tools, post-edit checks. */
-import { consumeToken, hasToken } from '../approvals.js';
+import { consumeToken, frozenTests, hasToken } from '../approvals.js';
 import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
@@ -87,7 +87,7 @@ function editGuard(input, ctx) {
  * @returns {import('../policy/edit.js').EditContext}
  */
 function editContext(ctx) {
-  const { isApproved, approvedScopes } = approvalQueries(ctx);
+  const { changeId, isApproved, approvedScopes } = approvalQueries(ctx);
   return {
     root: ctx.root,
     config: ctx.config,
@@ -96,6 +96,7 @@ function editContext(ctx) {
     change: ctx.change,
     isApproved,
     approvedScopes,
+    frozenTests: () => frozenTests(ctx.root, changeId),
     readFile: (rel) => readText(join(ctx.root, rel)),
   };
 }

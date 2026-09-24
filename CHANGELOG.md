@@ -18,8 +18,10 @@ The gated pipeline on top of the 0.1 guards.
 - **Tier floors**: heavy paths and the T1 file limit raise the minimum tier; a plan below
   its floor cannot be approved or build. A T2 plan is approved only after its spec.
 - **Task stages** (`keel task <T-n> red|green|refactor|done`), recorded by the Bash hook in
-  the hook-only store. Tests freeze when a task turns green: the edit guard refuses test
-  edits outside red, and the diff audit compares frozen hashes.
+  the hook-only store. **The test freeze:** tests change only in a red stage; when a task
+  turns green its tests are frozen by byte hash and assertion count until the change is
+  done. A later red stage may grow a frozen test but not weaken it, a shell write may not
+  touch one, and `/keel:approve scope tests` lifts the freeze for edits and audit alike.
 - **Git hooks** installed by `keel adopt` and checked by `keel doctor`: pre-commit,
   pre-merge-commit and pre-push re-check approvals; reference-transaction accepts only
   fast-forward branch updates whose commits were approved, so `--no-verify` does not help.

@@ -5,13 +5,10 @@
  * <stage>`; entering green freezes the hashes of every changed test. The `keel task` CLI
  * only validates and mirrors the stage into current.json for display.
  */
-import { join } from 'node:path';
 import { recordTrusted, trustedRecords } from './approvals.js';
 import { tasks as declaredTasks } from './changefile.js';
-import { approvalQueries, buildContext, readText } from './context.js';
-import { changedFiles } from './git.js';
-import { sha256 } from './hash.js';
-import { classifier } from './paths.js';
+import { approvalQueries, buildContext } from './context.js';
+import { snapshotTests } from './freeze.js';
 import { planProblem } from './policy/authority.js';
 import { parseCommands } from './shell.js';
 import { commandName } from './shell-wrappers.js';
@@ -86,23 +83,6 @@ export function taskInvocations(command) {
 }
 
 /**
- * Hashes of the tests that differ from HEAD (the tests written for the task).
- * @param {string} root
- * @param {import('./config.js').KeelConfig} config
- */
-export function changedTestHashes(root, config) {
-  const c = classifier(root, config);
-  /** @type {Record<string, string>} */
-  const files = {};
-  for (const f of changedFiles(root)) {
-    if (f.status === 'D' || !c.isTest(f.path)) continue;
-    const text = readText(join(root, f.path));
-    if (text !== null) files[f.path] = sha256(text);
-  }
-  return files;
-}
-
-/**
  * Called by the bash guard for an allowed command: records each task transition it contains
  * in the trusted store, freezing the changed tests when a task turns green.
  * @param {string} command
@@ -114,7 +94,7 @@ export function recordTransitions(command, ctx) {
   for (const { id, stage } of taskInvocations(command)) {
     const problem = transitionFrom(ctx, id, stage, isApproved);
     if (problem) return problem;
-    if (stage === 'green') recordTrusted(ctx.root, { type: 'freeze', change: changeId, task: id, files: changedTestHashes(ctx.root, ctx.config) });
+    if (stage === 'green') recordTrusted(ctx.root, { type: 'freeze', change: changeId, task: id, files: snapshotTests(ctx.root, ctx.config) });
     recordTrusted(ctx.root, { type: 'stage', change: changeId, task: id, stage });
     appendLedger(ctx.root, changeId, `task ${id} → ${stage}`);
   }

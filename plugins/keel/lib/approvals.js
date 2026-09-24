@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { appendJsonl, readJsonl, statePaths } from './state.js';
+import { asFrozen } from './freeze.js';
 
 export const APPROVABLE = /** @type {const} */ (['spec', 'plan', 'diff', 'commit', 'pr', 'amend', 'scope']);
 
@@ -172,14 +173,17 @@ export function trustedRecords(root) {
 }
 
 /**
- * Test hashes frozen for a change (later freezes of the same file win).
+ * Tests frozen for a change (a later freeze of the same file wins).
  * @param {string} root
  * @param {string | null} change
- * @returns {Record<string, string>}
+ * @returns {Record<string, import('./freeze.js').Frozen>}
  */
 export function frozenTests(root, change) {
-  /** @type {Record<string, string>} */
+  /** @type {Record<string, import('./freeze.js').Frozen>} */
   const files = {};
-  for (const r of /** @type {any[]} */ (records(root))) if (r.type === 'freeze' && r.change === change) Object.assign(files, r.files);
+  for (const r of /** @type {any[]} */ (records(root))) {
+    if (r.type !== 'freeze' || r.change !== change) continue;
+    for (const [rel, value] of Object.entries(r.files ?? {})) files[rel] = asFrozen(/** @type {any} */ (value));
+  }
   return files;
 }

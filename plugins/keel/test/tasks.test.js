@@ -50,7 +50,7 @@ test('the hook records stages, freezes tests at green, and the audit enforces th
   assert.match((await bash('keel task T-2 red')).stderr, /T-1 is still red/);
   assert.equal((await bash('keel task T-1 green')).code, 0);
   const store = readFileSync(join(dir, '.keel/state/approvals.jsonl'), 'utf8');
-  assert.match(store, /"type":"freeze".*"src\/a\.test\.ts":"sha256:/);
+  assert.match(store, /"type":"freeze".*"src\/a\.test\.ts":\{"hash":"sha256:[0-9a-f]{64}","assertions":1\}/);
   writeFileSync(join(dir, 'src/a.test.ts'), 'expect(1).toBe(1)\nexpect(2).toBe(3)\n');
   writeFiles(dir, { '.keel/state/current.json': JSON.stringify({ change: 'c1', file: 'docs/changes/c1.md', task: { id: 'T-1', stage: 'red' } }) });
   const stop = await guard('stop', { last_assistant_message: 'done' });

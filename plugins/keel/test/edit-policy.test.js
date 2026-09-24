@@ -80,12 +80,20 @@ test('files outside the plan ask the owner; approved scopes extend the plan', ()
   assert.equal(edit('/p/src/b/y.ts', { approvedScopes: () => ['src/b/**'] }), 'allow');
 });
 
-test('tests are editable in the red stage, or with the tests scope', () => {
+test('tests are editable only in a red stage, or with the tests scope', () => {
   const stage = (s) => ({ current: { change: 'c1', task: { id: 'T-1', stage: s } } });
   assert.equal(edit('/p/src/a/x.test.ts', stage('green')), 'deny');
   assert.equal(edit('/p/src/a/x.test.ts', stage('red')), 'allow');
   assert.equal(edit('/p/src/a/x.test.ts', { ...stage('green'), approvedScopes: () => ['tests'] }), 'allow');
-  assert.equal(edit('/p/src/a/x.test.ts'), 'allow', 'without task tracking tests follow the plan gate only');
+  assert.equal(edit('/p/src/a/x.test.ts'), 'deny', 'between tasks the tests stay frozen');
+  assert.equal(edit('/p/src/a/x.test.ts', { approvedScopes: () => ['tests'] }), 'allow');
+});
+
+test('in a later red stage a frozen test may grow but not lose assertions', () => {
+  const red = { current: { change: 'c1', task: { id: 'T-2', stage: 'red' } }, frozenTests: () => ({ 'src/a/x.test.ts': { hash: 'sha256:x', assertions: 2 } }) };
+  const write = (content) => edit('/p/src/a/x.test.ts', red, { tool_name: 'Write', tool_input: { file_path: '/p/src/a/x.test.ts', content } });
+  assert.equal(write('expect(1); expect(2); expect(3);'), 'allow');
+  assert.equal(write('expect(1);'), 'deny');
 });
 
 test('roles are enforced by agent type', () => {
