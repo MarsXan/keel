@@ -57,6 +57,7 @@ export function runCi(root, config, { base }) {
     if (f.status === 'D' || !f.path.startsWith(changesDir) || !f.path.endsWith('.md')) continue;
     const parsed = parseChange(after.get(f.path) ?? '');
     const status = parsed.front.status;
+    if (status === 'abandoned') continue;
     const stage = status === 'spec' ? 'spec' : ['verify', 'review', 'ship', 'done'].includes(status ?? '') ? 'verify' : 'plan';
     for (const e of lintChange(parsed, { config, stage, constitution, rel: f.path }).errors) failures.push(`${f.path}: ${e}`);
   }

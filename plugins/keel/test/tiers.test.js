@@ -28,3 +28,11 @@ test('floors for declared globs', () => {
   assert.equal(globFloor(['apps/api/src/migrations/001.sql'], config).tier, 'T2');
   assert.equal(globFloor(['docs/guide.md'], config).tier, 'T0');
 });
+
+test('budgets count unique source and test files only; concrete files meet every heavy glob', () => {
+  assert.equal(tierFloor(['libs/a.ts', 'libs/b.ts', 'libs/c.ts', 'docs/changes/1-x.md', 'README.md'], config).tier, 'T1', 'the change file and docs do not count');
+  assert.equal(globFloor(['libs/a.ts', 'libs/b.ts', 'libs/a.ts', 'libs/b.ts', 'libs/c.ts'], config).tier, 'T1', 'a path two tasks declare counts once');
+  const sql = { ...config, paths: { ...config.paths, source: ['db/**'], heavy: ['**/*.sql'] } };
+  assert.equal(globFloor(['db/001_init.sql'], sql).tier, 'T2');
+  assert.equal(globFloor(['db/**'], sql).tier, 'T1', 'a broad glob is judged on the real diff');
+});

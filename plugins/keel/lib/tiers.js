@@ -20,9 +20,9 @@ import { globsIntersect, matchAny } from './glob.js';
 export function tierFloor(paths, config) {
   const heavy = paths.find((p) => matchAny(p, config.paths.heavy));
   if (heavy) return { tier: 'T2', reasons: [`${heavy} is a heavy path`] };
-  if (paths.length > config.tiers.t1MaxFiles) return { tier: 'T2', reasons: [`${paths.length} files (a T1 change touches at most ${config.tiers.t1MaxFiles})`] };
-  const gated = paths.some((p) => matchAny(p, config.paths.source) || matchAny(p, config.paths.tests));
-  return gated ? { tier: 'T1', reasons: ['source or tests change'] } : { tier: 'T0', reasons: [] };
+  const gated = new Set(paths.filter((p) => matchAny(p, config.paths.source) || matchAny(p, config.paths.tests)));
+  if (gated.size > config.tiers.t1MaxFiles) return { tier: 'T2', reasons: [`${gated.size} source and test files (a T1 change touches at most ${config.tiers.t1MaxFiles})`] };
+  return gated.size > 0 ? { tier: 'T1', reasons: ['source or tests change'] } : { tier: 'T0', reasons: [] };
 }
 
 /**
@@ -32,24 +32,27 @@ export function tierFloor(paths, config) {
  * @returns {Floor}
  */
 export function globFloor(globs, config) {
-  for (const g of globs) {
+  const unique = [...new Set(globs)];
+  for (const g of unique) {
     const heavy = config.paths.heavy.find((h) => coversHeavy(g, h));
     if (heavy) return { tier: 'T2', reasons: [`${g} covers the heavy path ${heavy}`] };
   }
-  if (globs.length > config.tiers.t1MaxFiles) return { tier: 'T2', reasons: [`${globs.length} declared paths (a T1 change touches at most ${config.tiers.t1MaxFiles})`] };
-  const gated = globs.some((g) => [...config.paths.source, ...config.paths.tests].some((s) => globsIntersect(g, s)));
-  return gated ? { tier: 'T1', reasons: ['source or tests change'] } : { tier: 'T0', reasons: [] };
+  const gated = unique.filter((g) => [...config.paths.source, ...config.paths.tests].some((s) => globsIntersect(g, s)));
+  if (gated.length > config.tiers.t1MaxFiles) return { tier: 'T2', reasons: [`${gated.length} declared source and test paths (a T1 change touches at most ${config.tiers.t1MaxFiles})`] };
+  return gated.length > 0 ? { tier: 'T1', reasons: ['source or tests change'] } : { tier: 'T0', reasons: [] };
 }
 
-// A declared glob covers a heavy glob when they intersect, except that a heavy glob which
-// matches anywhere (such as "**/migrations/**") counts only when the declared path names its
-// segment literally, because every "**" could otherwise contain it. The end-of-turn floor
-// on the real diff still catches heavy files that a broad glob ends up touching.
+// A concrete declared file is heavy when any heavy glob matches it. A declared glob covers a
+// heavy glob when they intersect, except that a heavy glob which matches anywhere (such as
+// "**/migrations/**") counts only when the declared glob names its segment literally,
+// because every "**" could otherwise contain it. The end-of-turn floor on the real diff
+// still catches heavy files that a broad glob ends up touching.
 /**
  * @param {string} declared
  * @param {string} heavy
  */
 function coversHeavy(declared, heavy) {
+  if (!/[*?[{]/.test(declared)) return matchAny(declared, [heavy]);
   if (!heavy.startsWith('**/')) return globsIntersect(declared, heavy);
   const literal = heavy.split('/').find((seg) => seg !== '**' && !/[*?[{]/.test(seg));
   return literal !== undefined && declared.split('/').includes(literal) && globsIntersect(declared, heavy);

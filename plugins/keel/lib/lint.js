@@ -85,8 +85,11 @@ export function lintChange(parsed, { config, stage, constitution, rel }) {
   if (stage === 'spec') return { errors, warnings: [] };
 
   const list = tasks(parsed);
-  if (contentLines(parsed, 'Design').length === 0) errors.push('Design is empty');
-  if (list.length === 0) errors.push('Tasks has no tasks (- T-1 REQ-1 · files: path/** · done-when: <command>)');
+  // A T0 change (docs or configuration only) has no plan to approve.
+  if (tier !== 'T0') {
+    if (contentLines(parsed, 'Design').length === 0) errors.push('Design is empty');
+    if (list.length === 0) errors.push('Tasks has no tasks (- T-1 REQ-1 · files: path/** · done-when: <command>)');
+  }
   const designLines = contentLines(parsed, 'Design').length;
   if (!t2 && designLines > 10) errors.push(`a ${front.tier} design must fit in ten lines (it has ${designLines}); move detail into tasks, or re-tier to T2`);
   const seen = new Set();

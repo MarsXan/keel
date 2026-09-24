@@ -76,3 +76,9 @@ test('verify lint: every requirement appears in Verification', () => {
   assert.deepEqual(lint(t2('## Verification\nREQ-1, REQ-2 → a.test.ts\n'), 'verify').errors, []);
   assert.match(lint(t1(), 'verify', 'docs/changes/3-fix.md').errors.join(), /Verification is empty/);
 });
+
+test('a T0 change needs no plan', () => {
+  const t0 = `---\nid: 4-docs\ntier: T0\nstatus: build\n---\n# D\n## Intent\nFix the README typo.\n`;
+  assert.deepEqual(lint(t0, 'plan', 'docs/changes/4-docs.md').errors, []);
+  assert.match(lint(t0.replace('tier: T0', 'tier: T1'), 'plan', 'docs/changes/4-docs.md').errors.join('\n'), /Tasks has no tasks/);
+});

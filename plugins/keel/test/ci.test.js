@@ -90,3 +90,10 @@ test('ci-stage checks run and fail the gate; the CLI reports', async () => {
   commit(dir);
   assert.equal((await runCli(['ci'], { cwd: dir, env: { CLAUDE_PROJECT_DIR: dir } })).code, 1, '.keel/config.json is a guardrail file');
 });
+
+test('abandoned change files are not linted', () => {
+  const dir = branch();
+  writeFiles(dir, { 'docs/changes/6-y.md': '---\nid: 6-y\ntier: T1\nstatus: abandoned\n---\n# Y\n## Intent\nNot needed after all.\n' });
+  commit(dir);
+  assert.deepEqual(ci(dir).failures, []);
+});

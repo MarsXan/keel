@@ -109,5 +109,5 @@ test('a diff heavier than its tier is a finding', () => {
   assert.match(auditWorkingTree(dir, opts({ config: heavy })).findings.join('\n'), /needs tier T2[\s\S]*heavy path/);
   const many = { ...config, tiers: { t1MaxFiles: 1 } };
   writeFileSync(join(dir, 'src/a/y.ts'), '2');
-  assert.match(auditWorkingTree(dir, opts({ config: many })).findings.join('\n'), /2 files/);
+  assert.match(auditWorkingTree(dir, opts({ config: many })).findings.join('\n'), /2 source and test files/);
 });
