@@ -12,6 +12,14 @@ const PHRASES = {
   escalate: [/ESCALATE:/, /Decide alone/, /Never:/],
   'search-first': [/port or an event/],
   adopt: [/keel adopt/, /keel doctor/, /restart Claude Code/, /\/keel:amend/],
+  start: [/keel use/, /Tiers only go up/, /gh issue/, /git switch -c/, /Never work on a protected branch/],
+  spec: [/one question at a time/, /REQ-1: Given/, /\/keel:approve spec/, /keel lint-change --stage spec/],
+  plan: [/keel:explorer/, /keel:planner/, /\/keel:approve plan/, /keel lint-change --stage plan/, /done-when/],
+  build: [/keel task T-n red/, /keel:test-writer/, /keel:implementer/, /keel check/, /Confirm RED yourself/, /ESCALATE:/],
+  verify: [/keel:verifier/, /keel check --stage ci/, /## Verification/],
+  review: [/keel:reviewer-spec/, /intent_gap/, /bad_spec/, /three rounds/, /ESCALATE:/],
+  ship: [/## Deltas/, /\/keel:approve commit/, /\/keel:approve pr/, /Never merge, tag or release/, /--no-verify/],
+  spike: [/throwaway|Throwaway/, /spike\//, /\/keel:approve plan/],
   approve: [/You cannot approve anything yourself/, /bound to content/, /one-time token/],
   status: [/keel status/],
 };
@@ -30,7 +38,7 @@ for (const name of readdirSync(dir)) {
       assert.equal(field('disable-model-invocation'), undefined, 'disciplines are model-invocable (agents preload them)');
       assert.ok(text.split('\n').length <= 60, 'disciplines stay short');
     }
-    assert.ok(text.split('\n').length < 500, 'under 500 lines');
+    assert.ok(text.split('\n').length < 120, 'short enough to load whole');
     for (const re of PHRASES[/** @type {keyof typeof PHRASES} */ (name)] ?? []) assert.match(text, re);
   });
 }
