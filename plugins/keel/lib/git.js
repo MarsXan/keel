@@ -232,3 +232,31 @@ export function alias(root, name) {
   if (!/^[\w.-]+$/.test(name)) return null;
   return run(root, ['config', '--get', `alias.${name}`], { allowFail: true })?.trim() || null;
 }
+
+/**
+ * The branch a bare `git push` would update (from `@{push}`), falling back to the current
+ * branch when no push destination is configured yet.
+ * @param {string} root
+ */
+export function pushDestination(root) {
+  const target = run(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{push}'], { allowFail: true })?.trim();
+  if (target) return target.includes('/') ? target.slice(target.indexOf('/') + 1) : target;
+  return currentBranch(root);
+}
+
+/**
+ * Tracked files git status ignores because they are marked skip-worktree or
+ * assume-unchanged: changes to them are invisible to a status-based audit.
+ * @param {string} root
+ * @returns {string[]}
+ */
+export function hiddenFiles(root) {
+  const out = run(root, ['ls-files', '-v', '-z'], { allowFail: true });
+  if (out === null) return [];
+  const pre = prefix(root);
+  return out
+    .split('\0')
+    .filter((e) => e.length > 2 && (e[0] === 'S' || /[a-z]/.test(e[0])))
+    .map((e) => e.slice(2))
+    .map((p) => (pre && p.startsWith(pre) ? p.slice(pre.length) : p));
+}

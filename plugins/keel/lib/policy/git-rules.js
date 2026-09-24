@@ -1,10 +1,14 @@
 // @ts-check
 /**
- * Git rules: commits need an approval bound to the staged diff, pushes need a one-time
- * token, and history rewriting, hook bypasses, merges and tags are the owner's alone.
+ * Git rules: every git invocation is parsed (global options, `-c` settings, aliases) and its
+ * subcommand judged. Anything computed at run time or unknown fails closed; commits need an
+ * approval bound to the staged diff, pushes a one-time token; history rewriting, hook
+ * bypasses, configuration changes, merges and tags are the owner's alone.
  */
 import { resolvePath } from '../paths.js';
-import { allowUsing, deny } from './decision.js';
+import { guardedWrite } from './command-rules.js';
+import { deny } from './decision.js';
+import { checkoutRule, commitRule, fetchRule, pushRule, resetRule } from './git-refs.js';
 
 /**
  * @typedef {import('../shell.js').SimpleCommand} SimpleCommand
@@ -27,11 +31,14 @@ const GIT_BUILTINS = new Set(
     'symbolic-ref tag unpack-file unpack-objects update-index update-ref update-server-info var verify-commit ' +
     'verify-pack verify-tag version whatchanged worktree write-tree').split(' '),
 );
-const HISTORY_REWRITE = new Set(['commit-tree', 'update-ref', 'filter-branch', 'filter-repo', 'replace', 'fast-import', 'send-pack', 'http-push']);
+/** Subcommands that change refs, the index, config or the tree: their arguments must be static. */
+const GATED = new Set('push reset clean checkout switch restore branch tag config rebase merge cherry-pick revert am pull rm mv update-index worktree gc reflog notes symbolic-ref update-ref submodule bisect stash filter-branch filter-repo fast-import replace remote fetch apply commit-tree read-tree checkout-index'.split(' '));
+const HISTORY_REWRITE = new Set(['commit-tree', 'update-ref', 'filter-branch', 'filter-repo', 'replace', 'fast-import', 'send-pack', 'http-push', 'read-tree', 'checkout-index']);
 const OWNER_ONLY = new Set(['rebase', 'merge', 'cherry-pick', 'revert', 'am']);
 const SECRET_READING = new Set(['add', 'diff', 'show', 'log', 'blame', 'grep', 'cat-file', 'archive', 'apply', 'format-patch', 'stage']);
-const COMMIT_ARG_LONG = new Set(['--message', '--file', '--reuse-message', '--reedit-message', '--fixup', '--squash', '--template', '--author', '--date', '--cleanup', '--trailer']);
-const GIT_ENV_OVERRIDES = /^(SKIP|GIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|EXEC_PATH|TEMPLATE_DIR))$/;
+/** `git -c` keys that cannot run programs, reroute pushes, or change hooks. */
+const SAFE_CONFIG = /^(color(\..+)?|core\.(quotepath|autocrlf|safecrlf)|advice\..+|format\.(pretty|subjectprefix|numbered)|status\..+|log\.(date|decorate|abbrevcommit|showsignature|follow)|user\.(name|email)|author\.(name|email)|committer\.(name|email)|commit\.(gpgsign|verbose|cleanup)|init\.defaultbranch|merge\.conflictstyle|rerere\.enabled|safe\.directory|column\..+|i18n\..+|grep\.(patterntype|linenumber|column)|blame\.(date|coloring)|feature\..+|fetch\.parallel)$/i;
+const GIT_ENV_OVERRIDES = /^(SKIP|GIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|EXEC_PATH|TEMPLATE_DIR|NAMESPACE))$/;
 
 /**
  * @param {string[]} argv
@@ -64,14 +71,15 @@ function parseGit(argv) {
  */
 export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
   const g = parseGit(cmd.argv);
-  for (const kv of g.configs) {
-    const key = kv.split('=')[0].toLowerCase();
-    if (key === 'core.hookspath' || key.startsWith('alias.') || key.startsWith('include') || key === 'core.fsmonitor') {
-      return deny(`git -c ${key}=… is not allowed: it changes which hooks or commands git runs.`);
-    }
+  if (cmd.dynamic.slice(1, g.at + 1).some(Boolean)) {
+    return deny('Part of this git command (a global option or the subcommand) is computed at run time, so Keel cannot check it. Write it out literally.');
   }
-  if (g.other.some((o) => /^--(exec-path|config-env|git-dir|work-tree)=/.test(o))) {
-    return deny('Pointing git at another repository, work tree or exec path is not allowed; run git in the project.');
+  const unsafe = g.configs.find((kv) => !SAFE_CONFIG.test(kv.split('=')[0]));
+  if (unsafe !== undefined) {
+    return deny(`git -c ${unsafe.split('=')[0]}=… is not allowed: it can reroute pushes, run programs or change hooks. Only display and identity settings may be passed with -c.`);
+  }
+  if (g.other.some((o) => /^--(exec-path|config-env|git-dir|work-tree|namespace)=/.test(o))) {
+    return deny('Pointing git at another repository, work tree, namespace or exec path is not allowed; run git in the project.');
   }
   if (g.sub === null) return null;
   const envOverride = Object.keys(cmd.env).find((k) => GIT_ENV_OVERRIDES.test(k));
@@ -81,21 +89,45 @@ export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
   const dyn = cmd.dynamic.slice(g.at + 1);
   if (!GIT_BUILTINS.has(g.sub)) {
     const expansion = aliasDepth < 5 ? ctx.gitAlias(g.sub) : null;
-    if (!expansion) return null;
-    if (expansion.startsWith('!')) return evaluateNested(`${expansion.slice(1)} ${args.map(shellQuote).join(' ')}`);
+    if (!expansion) return deny(`Keel does not know "git ${g.sub}". Use a built-in git command, or ask the owner to run this one.`);
+    if (expansion.startsWith('!')) return evaluateNested(`${expansion.slice(1)} ${args.map((a, i) => (dyn[i] ? a : shellQuote(a))).join(' ')}`);
     const words = expansion.split(/\s+/).filter(Boolean);
     const argv = [...cmd.argv.slice(0, g.at), ...words, ...args];
     const dynamic = [...cmd.dynamic.slice(0, g.at), ...words.map(() => false), ...dyn];
     return gitRule({ ...cmd, argv, dynamic }, ctx, evaluateNested, aliasDepth + 1);
   }
-  const has = (/** @type {RegExp} */ re) => args.some((a) => re.test(a));
-  if (SECRET_READING.has(g.sub)) {
-    const secret = args.find((a) => !a.startsWith('-') && ctx.classify.isSecret(resolvePath(cwd, a, ctx.home)));
-    if (secret) return deny(`git ${g.sub} ${secret} would read or stage a secret file. Keel keeps secrets out of the agent's reach.`);
+  if (g.sub !== 'commit' && GATED.has(g.sub)) {
+    const computed = args.find((_, i) => dyn[i]);
+    if (computed !== undefined) return deny(`git ${g.sub} with an argument computed at run time (${computed}) cannot be checked; write the arguments out.`);
   }
-  switch (g.sub) {
+  const sub = g.sub;
+  const outputs = args.flatMap((a, i) => {
+    if (a === '--output' || (a === '-o' && ['archive', 'format-patch'].includes(sub))) return [args[i + 1] ?? ''];
+    return a.startsWith('--output=') ? [a.slice(9)] : [];
+  });
+  const written = outputs.length > 0 ? guardedWrite(outputs, { ...ctx, cwd }, `git ${sub} --output`) : null;
+  if (written) return written;
+  if (SECRET_READING.has(sub)) {
+    const secret = args.find((a) => !a.startsWith('-') && secretReference(a, cwd, ctx));
+    if (secret) return deny(`git ${sub} ${secret} would read or stage a secret file. Keel keeps secrets out of the agent's reach.`);
+  }
+  return subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested);
+}
+
+/**
+ * @param {string} sub
+ * @param {string[]} args
+ * @param {boolean[]} dyn
+ * @param {string} cwd
+ * @param {CommandContext} ctx
+ * @param {EvaluateNested} evaluateNested
+ * @returns {Decision | null}
+ */
+function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
+  const has = (/** @type {RegExp} */ re) => args.some((a) => re.test(a));
+  switch (sub) {
     case 'commit':
-      return commitRule(args, ctx);
+      return commitRule(args, dyn, ctx);
     case 'push':
       return pushRule(args, dyn, ctx);
     case 'stash':
@@ -105,15 +137,18 @@ export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
       return readOnly ? null : deny('Changing git configuration is not allowed. Ask the owner if a setting must change.');
     }
     case 'reset':
-      return resetRule(args, cwd, ctx);
+      return resetRule(args, cwd, ctx, touchesGuarded);
     case 'clean':
       return has(/^(-n|--dry-run|-[a-zA-Z]*n[a-zA-Z]*)$/) && !has(/^-[a-zA-Z]*f/) ? null : deny('git clean deletes untracked files for good. Remove specific files instead, or ask the owner.');
     case 'tag':
       return args.length === 0 || has(/^(-l|--list)$/) ? null : deny('Tags are releases; creating or moving them is the owner\'s call.');
     case 'pull':
       return deny('git pull merges into the branch; use git fetch and let the owner decide how to integrate.');
+    case 'fetch':
+      return fetchRule(args, ctx);
     case 'branch':
       if (has(/^(-D|-f|--force|-M|-C)$/) || has(/^-[a-zA-Z]*[DfMC]/)) return deny('Force-deleting, force-moving or overwriting branches is not allowed.');
+      if (has(/^(-u|--set-upstream-to(=.*)?|--unset-upstream|--edit-description)$/)) return deny('Changing branch configuration (upstream, description) is not allowed.');
       if (has(/^(-d|--delete|-m|--move)$/) && args.some((a) => ctx.config.project.protectedBranches.includes(a))) {
         return deny('Protected branches cannot be deleted or renamed.');
       }
@@ -121,12 +156,18 @@ export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
     case 'checkout':
     case 'switch':
     case 'restore':
-      return checkoutRule(g.sub, args, cwd, ctx);
+      return checkoutRule(sub, args, cwd, ctx, touchesGuarded);
     case 'rm':
     case 'mv': {
       const hit = args.filter((a) => !a.startsWith('-')).find((a) => touchesGuarded(ctx, resolvePath(cwd, a, ctx.home)));
-      return hit ? deny(`git ${g.sub} ${hit} touches a protected Keel path; guardrail files change only through /keel:amend.`) : null;
+      return hit ? deny(`git ${sub} ${hit} touches a protected Keel path; guardrail files change only through /keel:amend.`) : null;
     }
+    case 'update-index':
+      return args.every((a) => ['--refresh', '--really-refresh', '-q', '--ignore-missing', '--unmerged'].includes(a))
+        ? null
+        : deny('git update-index can hide changes from git status (skip-worktree, assume-unchanged) or rewrite the index; not allowed.');
+    case 'remote':
+      return ['add', 'set-url', 'rename', 'remove', 'rm', 'set-head', 'set-branches'].includes(args[0]) ? deny(`git remote ${args[0]} changes the repository configuration; that is the owner's call.`) : null;
     case 'worktree':
       return args[0] === 'remove' && has(/^(-f|--force)$/) ? deny('Force-removing a worktree discards its uncommitted work.') : null;
     case 'gc':
@@ -142,134 +183,26 @@ export function gitRule(cmd, ctx, evaluateNested, aliasDepth = 0) {
     case 'bisect':
       return args[0] === 'run' ? evaluateNested(args.slice(1).map(shellQuote).join(' ')) : null;
     default:
-      if (OWNER_ONLY.has(g.sub)) {
-        return has(/^--(abort|quit)$/) ? null : deny(`git ${g.sub} rewrites or merges history; that is the owner's call.`);
-      }
-      if (HISTORY_REWRITE.has(g.sub)) return deny(`git ${g.sub} rewrites refs or history directly; that is not allowed.`);
+      if (OWNER_ONLY.has(sub)) return has(/^--(abort|quit)$/) ? null : deny(`git ${sub} rewrites or merges history; that is the owner's call.`);
+      if (HISTORY_REWRITE.has(sub)) return deny(`git ${sub} rewrites refs, the index or history directly; that is not allowed.`);
       return null;
   }
 }
 
-/** @param {string[]} args @param {CommandContext} ctx */
-function commitRule(args, ctx) {
-  /** @type {string[]} */
-  const denied = [];
-  const operands = [];
-  let dryRun = false;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === '--') {
-      operands.push(...args.slice(i + 1));
-      break;
-    }
-    if (a.startsWith('--')) {
-      const name = a.split('=')[0];
-      if (['--no-verify', '--all', '--amend', '--include', '--only', '--patch', '--interactive', '--pathspec-from-file'].includes(name)) denied.push(name);
-      if (name === '--dry-run') dryRun = true;
-      if (!a.includes('=') && COMMIT_ARG_LONG.has(name)) i++;
-      continue;
-    }
-    if (a.startsWith('-') && a.length > 1) {
-      for (let k = 1; k < a.length; k++) {
-        const ch = a[k];
-        const flag = { n: '-n (--no-verify)', a: '-a (--all)', i: '-i (--include)', o: '-o (--only)', p: '-p (--patch)' }[ch];
-        if (flag) denied.push(flag);
-        if ('mFCct'.includes(ch)) {
-          if (k === a.length - 1) i++;
-          break;
-        }
-        if ('Su'.includes(ch)) break;
-      }
-      continue;
-    }
-    operands.push(a);
-  }
-  if (operands.length > 0) denied.push(`pathspec ${operands.join(' ')}`);
-  if (denied.some((d) => d.includes('no-verify'))) {
-    return deny('Skipping git hooks (--no-verify / -n) is never allowed. Fix what the hook reports instead.');
-  }
-  if (denied.length > 0) {
-    return deny(`git commit with ${denied.join(', ')} commits something other than the reviewed index. Stage exactly the intended changes with git add, get the owner's /keel:approve commit, then run a plain git commit -m "…".`);
-  }
-  if (dryRun || ctx.isApproved('commit', ctx.stagedDiffHash())) return null;
-  return deny('Committing needs the owner\'s approval of exactly what is staged. Stage the changes, show the owner `git diff --cached --stat`, ask them to type /keel:approve commit, then run the same commit. Changing the staged content afterwards voids the approval.');
-}
-
-/** @param {string[]} args @param {boolean[]} dyn @param {CommandContext} ctx */
-function pushRule(args, dyn, ctx) {
-  const operands = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a === '-n' || a === '--dry-run') return null;
-    if (/^(-f|--force|--force-with-lease(=.*)?|--force-if-includes|--mirror|-d|--delete|--prune|--all|--branches|--tags|--follow-tags|--no-verify|--receive-pack(=.*)?|--exec(=.*)?)$/.test(a)) {
-      return deny(`git push ${a} is not allowed: no force, deletes, tags, mirrors or hook bypasses. Push one feature branch normally.`);
-    }
-    if (a === '-o' || a === '--push-option' || a === '--repo') {
-      i++;
-      continue;
-    }
-    if (a.startsWith('-')) continue;
-    if (dyn[i]) return deny('The push target is computed at run time; spell out the remote and branch.');
-    operands.push(a);
-  }
-  const branch = ctx.branch();
-  const refspecs = operands.slice(1);
-  const targets = refspecs.length > 0 ? refspecs.map((r) => pushTarget(r, branch)) : [branch];
-  for (const t of targets) {
-    if (t === null) return deny('Cannot tell which branch this push updates (detached HEAD or an empty refspec); push a named feature branch.');
-    if (t.startsWith('+')) return deny('Force pushes (+refspec) are not allowed.');
-    if (t === '') return deny('Deleting remote branches is not allowed.');
-    if (t.startsWith('refs/tags/')) return deny('Pushing tags is the owner\'s call.');
-    if (ctx.config.project.protectedBranches.includes(t.replace(/^refs\/heads\//, ''))) {
-      return deny(`Pushing to the protected branch "${t.replace(/^refs\/heads\//, '')}" is never allowed; the owner merges through a pull request.`);
-    }
-  }
-  if (!ctx.hasToken('pr', 'push')) {
-    return deny('Pushing needs a one-time token: summarise the branch for the owner and ask them to type /keel:approve pr. The token covers one push and one pull request for the branch as it is now.');
-  }
-  return allowUsing([{ what: 'pr', action: 'push' }]);
-}
-
 /**
- * Destination branch of a refspec: "" for a delete, null when unknown, "+…" when forced.
- * @param {string} refspec
- * @param {string | null} branch
+ * A path or `<rev>:<path>` object name that points at a secret file.
+ * @param {string} arg
+ * @param {string} cwd
+ * @param {CommandContext} ctx
  */
-function pushTarget(refspec, branch) {
-  if (refspec.startsWith('+')) return '+';
-  if (refspec === ':') return null;
-  const colon = refspec.indexOf(':');
-  const src = colon < 0 ? refspec : refspec.slice(0, colon);
-  const dst = colon < 0 ? refspec : refspec.slice(colon + 1);
-  if (colon >= 0 && src === '') return '';
-  return dst === 'HEAD' || dst === '@' ? branch : dst;
-}
-
-/** @param {string[]} args @param {string} cwd @param {CommandContext} ctx */
-function resetRule(args, cwd, ctx) {
-  if (args.some((a) => /^--(hard|merge|keep|soft)$/.test(a))) {
-    return deny('git reset --hard/--soft/--merge/--keep moves the branch or discards work; that is the owner\'s call.');
+function secretReference(arg, cwd, ctx) {
+  const colon = arg.indexOf(':');
+  if (colon >= 0 && !/^[a-z]+:\/\//i.test(arg)) {
+    const path = arg.slice(colon + 1);
+    const abs = path.startsWith('./') || path.startsWith('../') ? resolvePath(cwd, path, ctx.home) : resolvePath(ctx.root, path, ctx.home);
+    if (path && ctx.classify.isSecret(abs)) return true;
   }
-  const dash = args.indexOf('--');
-  const before = (dash < 0 ? args : args.slice(0, dash)).filter((a) => !a.startsWith('-'));
-  const moves = before.find((a) => a !== 'HEAD' && (/[~^@]/.test(a) || /^[0-9a-f]{7,40}$/.test(a) || /^(origin|upstream)\//.test(a)));
-  if (moves) return deny(`git reset ${moves} moves the branch; to unstage use git restore --staged <file>.`);
-  const touched = before.find((a) => a !== 'HEAD' && touchesGuarded(ctx, resolvePath(cwd, a, ctx.home)));
-  return touched ? deny(`git reset ${touched} touches a protected Keel path.`) : null;
-}
-
-/** @param {string} sub @param {string[]} args @param {string} cwd @param {CommandContext} ctx */
-function checkoutRule(sub, args, cwd, ctx) {
-  if (args.some((a) => /^(-f|--force|--discard-changes|--overwrite-ignore)$/.test(a))) {
-    return deny(`git ${sub} --force discards uncommitted work; commit or move it aside first.`);
-  }
-  const dash = args.indexOf('--');
-  const paths = sub === 'restore' ? args.filter((a) => !a.startsWith('-')) : dash >= 0 ? args.slice(dash + 1) : [];
-  if (paths.some((p) => ['.', ':/', '*', './'].includes(p))) {
-    return deny(`git ${sub} of the whole tree discards every uncommitted change, including the owner's. Restore specific files.`);
-  }
-  const hit = paths.find((p) => touchesGuarded(ctx, resolvePath(cwd, p, ctx.home)));
-  return hit ? deny(`git ${sub} ${hit} would overwrite a protected Keel path.`) : null;
+  return ctx.classify.isSecret(resolvePath(cwd, arg, ctx.home));
 }
 
 /** @param {CommandContext} ctx @param {string} abs */

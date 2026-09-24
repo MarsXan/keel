@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { git, gitRepo, hookPayload, runCli, writeFiles } from './helpers.js';
+import { git, gitRepo, hookPayload, runCli, tmpDir, writeFiles } from './helpers.js';
 
 const CHANGE = `---\nid: c1\ntier: T1\nstatus: plan\n---\n# Add a thing\n## Intent\nAdd a thing.\n## Design\nOne module.\n## Tasks\n- T-1 · files: src/a/** · done-when: npm test\n## Approvals\n`;
 
@@ -235,4 +235,16 @@ test('keel check and keel diff-audit report canonically', async () => {
   const audit = await keel(dir, ['diff-audit']);
   assert.equal(audit.code, 1);
   assert.match(audit.stdout, /1 finding|finding\(s\)/);
+});
+
+test('the bash guard expands the owner\'s shell aliases from the Claude Code snapshot', async () => {
+  const dir = adoptedRepo();
+  git(dir, ['checkout', '-q', '-b', 'feat/x']);
+  const config = tmpDir();
+  writeFiles(config, { 'shell-snapshots/snapshot-zsh-1-a.sh': "alias -- 'gpf!'='git push --force'\nalias -- gst='git status'\n" });
+  const run = (command) => runCli(['guard', 'bash'], { input: JSON.stringify(hookPayload('bash', { cwd: dir, tool_name: 'Bash', tool_input: { command } })), env: { CLAUDE_PROJECT_DIR: dir, CLAUDE_CONFIG_DIR: config } });
+  const forced = await run('gpf!');
+  assert.equal(forced.code, 2);
+  assert.match(forced.stderr, /shell alias for "git push --force"/);
+  assert.equal((await run('gst')).code, 0);
 });

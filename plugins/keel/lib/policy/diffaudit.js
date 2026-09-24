@@ -6,7 +6,7 @@
  */
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { changedFiles, headContents } from '../git.js';
+import { changedFiles, headContents, hiddenFiles } from '../git.js';
 import { matchAny } from '../glob.js';
 import { sha256 } from '../hash.js';
 import { classifier } from '../paths.js';
@@ -73,6 +73,10 @@ export function auditWorkingTree(root, opts) {
   if (gated.length > 0) {
     const problem = planProblem(opts.change, opts.isApproved);
     if (problem) findings.push(`source or tests changed without an approved plan (${list(gated)}). ${problem}`);
+  }
+  const hidden = hiddenFiles(root);
+  if (hidden.length > 0) {
+    findings.push(`files hidden from git status (skip-worktree or assume-unchanged): ${list(hidden)}. Undo it with git update-index --no-skip-worktree / --no-assume-unchanged so their changes can be audited.`);
   }
   const paths = changed.map((f) => f.path);
   const packages = packagesOf(paths, opts.config.packages);

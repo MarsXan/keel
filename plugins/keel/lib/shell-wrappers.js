@@ -4,51 +4,16 @@
  * `eval`, `pnpm exec`, …). Each wrapper yields the command it would run, which is itself
  * unwrapped, so a policy sees `git push` in `sudo env HUSKY=0 sh -c 'git push'`.
  */
+import { commandName, skipOptions, STDIN_SCRIPT, stdinScripts } from './shell-words.js';
+
+export { commandName, skipOptions, STDIN_SCRIPT, stdinScripts };
 
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'mksh', 'ash', 'yash', 'fish']);
 
 /**
  * @typedef {import('./shell.js').SimpleCommand} SimpleCommand
  * @typedef {(script: string) => SimpleCommand[]} ParseNested
- * @typedef {{ short?: string, long?: string[], optionalShort?: string }} OptionSpec
  */
-
-/** @param {string} word */
-export function commandName(word) {
-  return word.slice(word.lastIndexOf('/') + 1);
-}
-
-/**
- * Index of the first operand after options. `short` lists short options that take an
- * argument, `optionalShort` those that take one only when attached (`-i{}`), `long` the
- * long options that take an argument when not written as `--opt=value`.
- * @param {string[]} argv
- * @param {number} from
- * @param {OptionSpec} spec
- */
-export function skipOptions(argv, from, spec) {
-  let i = from;
-  while (i < argv.length) {
-    const a = argv[i];
-    if (a === '--') return i + 1;
-    if (!a.startsWith('-') || a === '-') return i;
-    if (a.startsWith('--')) {
-      i += (spec.long ?? []).includes(a) ? 2 : 1;
-      continue;
-    }
-    let takesNext = false;
-    for (let k = 1; k < a.length; k++) {
-      const ch = a[k];
-      if ((spec.short ?? '').includes(ch)) {
-        takesNext = k === a.length - 1;
-        break;
-      }
-      if ((spec.optionalShort ?? '').includes(ch)) break;
-    }
-    i += takesNext ? 2 : 1;
-  }
-  return i;
-}
 
 /**
  * A new command running `argv.slice(from)`, inheriting stdin and environment.
@@ -221,13 +186,12 @@ function unwrapShell(cmd) {
     i += 1 + skip;
   }
   if (hasC) return argv[i] !== undefined ? [{ script: argv[i], via: `${commandName(argv[0])} -c` }] : [];
-  if (i < argv.length) {
-    cmd.scriptFile = argv[i];
+  if (i < argv.length && !STDIN_SCRIPT.test(argv[i])) {
+    if (cmd.dynamic[i]) cmd.stdinScript = true; // a script path or process substitution computed at run time
+    else cmd.scriptFile = argv[i];
     return [];
   }
-  const scripts = [...cmd.heredocs.map((h) => h.body), ...cmd.hereStrings];
-  if (scripts.length === 0 && cmd.pipedInput) cmd.stdinScript = true;
-  return scripts.map((script) => ({ script, via: `${commandName(argv[0])} stdin` }));
+  return stdinScripts(cmd, `${commandName(argv[0])} stdin`);
 }
 
 /** @param {SimpleCommand} cmd */

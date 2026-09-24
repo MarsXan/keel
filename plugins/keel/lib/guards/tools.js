@@ -4,12 +4,14 @@ import { consumeToken, hasToken } from '../approvals.js';
 import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
-import { alias, currentBranch } from '../git.js';
+import { readdirSync } from 'node:fs';
+import { alias, currentBranch, pushDestination } from '../git.js';
 import { context, ESCALATE_HINT, preToolUse } from '../io.js';
 import { classifier, toRel } from '../paths.js';
 import { evaluateBash } from '../policy/bash.js';
 import { packagesOf } from '../policy/diffaudit.js';
 import { evaluateEdit } from '../policy/edit.js';
+import { loadShellSnapshot } from '../shell-snapshot.js';
 import { join, resolve } from 'node:path';
 
 /**
@@ -26,7 +28,7 @@ function answer(d) {
 }
 
 /** @type {Guard} */
-function bashGuard(input, ctx) {
+function bashGuard(input, ctx, env) {
   const command = input.tool_input?.command;
   if (typeof command !== 'string') return { code: 2, stderr: 'keel: this shell call has no command string, so it cannot be checked.\n' };
   const { changeId, isApproved } = approvalQueries(ctx);
@@ -47,8 +49,17 @@ function bashGuard(input, ctx) {
     hasToken: (what, action) => hasToken(ctx.root, { what: /** @type {any} */ (what), action, hash: branchState() }),
     stagedDiffHash: () => (staged ??= stagedHash(ctx.root)),
     branch: () => currentBranch(ctx.root),
+    pushDestination: () => pushDestination(ctx.root),
     gitAlias: (name) => alias(ctx.root, name),
     readFile: (abs) => readText(abs),
+    listDir: (abs) => {
+      try {
+        return readdirSync(abs);
+      } catch {
+        return null;
+      }
+    },
+    shell: loadShellSnapshot(ctx.home, env),
   });
   if (d.decision === 'allow') {
     for (const c of d.consume ?? []) consumeToken(ctx.root, { what: /** @type {any} */ (c.what), action: c.action, hash: branchState() });

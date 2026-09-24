@@ -18,6 +18,7 @@ const GH_TOP = new Set(['auth', 'browse', 'codespace', 'gist', 'issue', 'org', '
 export function ghRule(cmd, ctx) {
   const [, group, sub, ...rest] = cmd.argv;
   if (!group) return null;
+  if (cmd.dynamic.slice(1, 3).some(Boolean)) return deny('The gh command or subcommand is computed at run time, so Keel cannot check it. Write it out literally.');
   if (!GH_TOP.has(group)) return deny(`gh ${group} is not a command Keel knows (it may be an alias or extension); use a built-in gh command.`);
   const args = [sub, ...rest].filter((a) => a !== undefined);
   const readOnly = (/** @type {string[]} */ allowed) => (allowed.includes(sub) ? null : deny(`gh ${group} ${sub ?? ''} changes shared state; that is the owner's call.`));

@@ -199,10 +199,10 @@ test('agents may not run guards, forge approvals or loosen Claude Code', () => {
 });
 
 test('privilege escalation and catastrophic commands are denied', () => {
-  for (const c of ['sudo ls', 'doas ls', 'su -c ls', 'rm -rf node_modules', 'rm -fr x', 'rm -r -f x', 'rm -rf --no-preserve-root /', 'mkfs.ext4 /dev/x', 'dd if=/dev/zero of=/dev/disk0', 'diskutil eraseDisk JHFS+ x disk2', 'shutdown -h now', 'rm -r ~/Documents']) {
+  for (const c of ['sudo ls', 'doas ls', 'su -c ls', 'rm -rf --no-preserve-root /', 'mkfs.ext4 /dev/x', 'dd if=/dev/zero of=/dev/disk0', 'diskutil eraseDisk JHFS+ x disk2', 'shutdown -h now', 'rm -r ~/Documents']) {
     assert.equal(decide(c), 'deny', c);
   }
-  assert.equal(decide('rm -r build'), 'allow');
+  for (const c of ['rm -r build', 'rm -rf node_modules', 'rm -fr x', 'rm -r -f x']) assert.equal(decide(c), 'allow', c);
   assert.equal(decide('rm -r /tmp/keel-x'), 'allow');
 });
 

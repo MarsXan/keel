@@ -3,8 +3,8 @@
  * Rules for non-git commands: deleting, writing guarded paths, reading secrets, inline
  * interpreter code, and commands that reach outside the machine.
  */
-import { literalPrefix } from '../glob.js';
-import { realPath, resolvePath } from '../paths.js';
+import { globToRegExp, matchAny } from '../glob.js';
+import { realPath, resolvePath, toRel } from '../paths.js';
 import { skipOptions } from '../shell-wrappers.js';
 import { ask, deny } from './decision.js';
 
@@ -14,73 +14,48 @@ import { ask, deny } from './decision.js';
  * @typedef {import('./bash.js').CommandContext} CommandContext
  */
 
-export const INTERPRETERS = {
-  node: ['-e', '--eval', '-p', '--print'],
-  bun: ['-e', '--eval', '-p', '--print'],
-  deno: [],
-  python: ['-c'],
-  ruby: ['-e'],
-  perl: ['-e', '-E'],
-  php: ['-r'],
-  osascript: ['-e'],
-  lua: ['-e'],
-  Rscript: ['-e'],
-  pwsh: ['-c', '-Command', '-command'],
-};
-
-/** Interpreter key for a command name (python3.12 → python), or null. @param {string} name */
-export function interpreterOf(name) {
-  if (/^python[\d.]*$/.test(name)) return 'python';
-  if (/^(pypy|pypy3)$/.test(name)) return 'python';
-  if (name === 'luajit') return 'lua';
-  if (name === 'powershell') return 'pwsh';
-  return Object.hasOwn(INTERPRETERS, name) ? /** @type {keyof typeof INTERPRETERS} */ (name) : null;
-}
-
-/** Text that signals an attempt to commit, push, bypass hooks or forge approvals. */
-export const DANGER = [
-  /\bgit\b[^\n;&|]*?\b(push|commit|reset|clean|stash|rebase|merge|cherry-pick|update-ref|filter-branch|tag)\b/,
-  /--no-verify\b/,
-  /hooks?path/i,
-  /\b(HUSKY|LEFTHOOK)\s*=\s*0\b/,
-  /\bCLAUDECODE\b/,
-  /keel:approve/i,
-  /\bkeel\b[^\n;&|]*\bguard\b/,
-];
-
 const TEMP = ['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'];
+/** Home-directory files that configure the shell, git or Claude Code. */
+const HOME_GUARDED = ['.gitconfig', '.config/git/**', '.zshrc', '.zshenv', '.zprofile', '.zlogin', '.bashrc', '.bash_profile', '.profile', '.claude/**', '.claude.json', '.ssh/**', '.config/gh/**'];
 const WRITE_TARGETS = new Set(['cp', 'mv', 'install', 'ln', 'rsync', 'dd', 'truncate', 'touch', 'chmod', 'chown', 'chgrp', 'chflags', 'xattr', 'setfacl', 'tee', 'sed', 'perl', 'ruby', 'gawk', 'curl', 'wget', 'unzip', 'tar', 'patch']);
 const SECRET_SAFE = new Set(['ls', 'stat', 'file', 'test', '[', '[[', 'find', 'fd', 'basename', 'dirname', 'realpath', 'readlink', 'echo', 'printf', 'git', 'mkdir', 'which', 'type', 'command']);
 
+/** Targets that mean "everything": the working directory, its parent, the filesystem root, home. */
+const EVERYTHING = new Set(['.', './', '..', '../', '/', '~', '~/', '*', '.*', './*', '/*', '~/*']);
+
 /**
- * `rm` and friends: no recursive force deletes, nothing guarded, no recursive deletes
- * outside the project (temporary directories excepted).
+ * `rm` and friends. Deleting ordinary project folders (dist, coverage) is fine; deleting the
+ * project root, git's data, guarded paths, anything outside the project (temporary
+ * directories excepted), or a recursive delete of a path computed at run time is not.
  * @param {SimpleCommand} cmd
  * @param {CommandContext} ctx
  */
 export function removeRule(cmd, ctx) {
   const args = cmd.argv.slice(1);
   let recursive = false;
-  let force = false;
+  /** @type {{ word: string, dynamic: boolean }[]} */
   const targets = [];
   let options = true;
-  for (const a of args) {
+  args.forEach((a, i) => {
     if (options && a === '--') options = false;
-    else if (options && a.startsWith('--')) {
-      recursive ||= a === '--recursive';
-      force ||= a === '--force';
-    } else if (options && a.startsWith('-') && a.length > 1) {
-      recursive ||= /[rR]/.test(a);
-      force ||= a.includes('f');
-    } else targets.push(a);
-  }
-  if (recursive && force) return deny('rm -rf is not allowed. Delete specific files or directories without -f, or ask the owner.');
-  for (const t of targets) {
-    const abs = realPath(resolvePath(ctx.cwd, t, ctx.home));
+    else if (options && a.startsWith('--')) recursive ||= a === '--recursive';
+    else if (options && a.startsWith('-') && a.length > 1) recursive ||= /[rR]/.test(a);
+    else targets.push({ word: a, dynamic: cmd.dynamic[i + 1] });
+  });
+  for (const { word, dynamic } of targets) {
+    if (EVERYTHING.has(word)) return deny(`rm ${word} would delete the project, its parent, the home directory or everything. Delete specific paths.`);
+    if (dynamic) {
+      if (recursive) return deny(`Recursive delete of a path computed at run time (${word}) is not allowed; write the path out.`);
+      continue;
+    }
+    const abs = realPath(resolvePath(ctx.cwd, word, ctx.home));
     const rel = ctx.classify.rel(abs);
-    if (rel !== null && ctx.classify.touchesProtected(rel)) return deny(`Deleting ${t} would remove a protected Keel path.`);
+    if (rel === '' || `${ctx.root}/`.startsWith(`${abs}/`)) return deny(`rm ${word} would delete the project itself.`);
+    if (rel !== null && (ctx.classify.touchesProtected(rel) || rel === '.git' || rel.startsWith('.git/'))) {
+      return deny(`Deleting ${word} would remove a protected Keel path or git's own data.`);
+    }
     if (recursive && rel === null && !TEMP.some((p) => `${abs}/`.startsWith(p))) {
-      return deny(`Recursive delete outside the project (${t}) is not allowed.`);
+      return deny(`Recursive delete outside the project (${word}) is not allowed.`);
     }
   }
   return null;
@@ -191,6 +166,10 @@ export function guardedWrite(targets, ctx, how) {
     if (!t || t === '/dev/null' || t.startsWith('/dev/std') || t === '/dev/tty') continue;
     for (const abs of candidatePaths(t, ctx)) {
       const rel = ctx.classify.rel(abs);
+      const homeRel = toRel(ctx.home, abs);
+      if (homeRel !== null && rel === null && matchAny(homeRel, HOME_GUARDED)) {
+        return deny(`${how} would write ${t}, a shell, git or Claude Code configuration file in the home directory.`);
+      }
       if (rel !== null && ctx.classify.touchesProtected(rel)) {
         return deny(`${how} would write ${t}, a protected Keel path. Guardrail files change only through /keel:amend (Edit tool, owner approval); Keel state is written only by Keel.`);
       }
@@ -216,48 +195,38 @@ function candidatePaths(t, ctx) {
  * @param {CommandContext} ctx
  */
 export function secretRule(cmd, name, ctx) {
-  const inputs = cmd.redirects.filter((r) => r.op === '<' || r.op === '<>').map((r) => r.target);
-  const args = SECRET_SAFE.has(name) ? [] : cmd.argv.slice(1).filter((a, i) => !cmd.dynamic[i + 1]);
-  for (const raw of [...inputs, ...args]) {
-    const value = raw.includes('=') && raw.startsWith('-') ? raw.slice(raw.indexOf('=') + 1) : raw;
+  const inputs = cmd.redirects.filter((r) => r.op === '<' || r.op === '<>').map((r) => ({ word: r.target, dynamic: false }));
+  const args = SECRET_SAFE.has(name) ? [] : cmd.argv.slice(1).map((word, i) => ({ word, dynamic: cmd.dynamic[i + 1] }));
+  for (const { word, dynamic } of [...inputs, ...args]) {
+    const value = word.includes('=') && word.startsWith('-') ? word.slice(word.indexOf('=') + 1) : word;
     const path = value.replace(/^@/, '');
     if (!path || path.startsWith('-')) continue;
-    if (ctx.classify.isSecret(resolvePath(ctx.cwd, path, ctx.home))) {
-      return deny(`${name} ${raw} would read a secret file. Keel keeps secrets out of the agent's reach; ask the owner for any value you need, or use the .example file.`);
+    const candidates = dynamic ? expandGlob(path, ctx) : [resolvePath(ctx.cwd, path, ctx.home)];
+    if (candidates.some((abs) => ctx.classify.isSecret(abs))) {
+      return deny(`${name} ${word} would read a secret file. Keel keeps secrets out of the agent's reach; ask the owner for any value you need, or use the .example file.`);
     }
   }
   return null;
 }
 
-/** Protected path fragments and secret-looking paths that must not appear in inline code. @param {CommandContext} ctx */
-function codeNeedles(ctx) {
-  const needles = new Set(['.keel/state', 'approvals.jsonl', '.git/hooks', '.git/config']);
-  for (const g of ctx.config.paths.protected) {
-    const lit = literalPrefix(g);
-    if (lit.length >= 4) needles.add(lit);
-  }
-  return [...needles];
-}
-
-const SECRET_IN_CODE = /(?:^|[\s'"`(/=,])(\.env(?:\.[\w.-]+)?|id_(?:rsa|ed25519|ecdsa|dsa)\b|\.ssh\/|\.aws\/|\.netrc|\.pgpass)/;
-
 /**
- * Inline code (`node -e`, `python -c`, heredocs fed to an interpreter) must not touch
- * guarded paths, secrets, or commit/push by another route.
- * @param {string} code
+ * Files a simple glob (wildcards in its last segment only) matches right now; [] for
+ * words with parameter or command substitutions, whose value Keel cannot know.
+ * @param {string} word
  * @param {CommandContext} ctx
- * @param {string} name
+ * @returns {string[]}
  */
-export function inlineCodeRule(code, ctx, name) {
-  const needle = codeNeedles(ctx).find((n) => code.includes(n));
-  if (needle) return deny(`Inline ${name} code mentions ${needle}, a protected Keel path. Use the Edit tool for files you may change; guardrail files change only through /keel:amend.`);
-  const secret = SECRET_IN_CODE.exec(code);
-  if (secret && !ctx.config.paths.secretsAllow.some((a) => secret[1] === a)) {
-    return deny(`Inline ${name} code references ${secret[1]}, which looks like a secret. Keel keeps secrets out of the agent's reach.`);
-  }
-  const danger = DANGER.find((re) => re.test(code));
-  if (danger) return deny(`Inline ${name} code would run a git/Keel operation Keel gates (${danger.source}). Run that command directly so Keel can check it.`);
-  return null;
+function expandGlob(word, ctx) {
+  if (/[$`]/.test(word) || !/[*?[]/.test(word)) return [];
+  const slash = word.lastIndexOf('/');
+  const dirPart = slash >= 0 ? word.slice(0, slash) || '/' : '.';
+  const base = slash >= 0 ? word.slice(slash + 1) : word;
+  if (/[*?[]/.test(dirPart)) return [];
+  const dir = resolvePath(ctx.cwd, dirPart, ctx.home);
+  const re = globToRegExp(base);
+  return (ctx.listDir(dir) ?? [])
+    .filter((n) => (base.startsWith('.') || !n.startsWith('.')) && re.test(n))
+    .map((n) => resolvePath(dir, n, ctx.home));
 }
 
 /**
