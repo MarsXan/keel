@@ -91,7 +91,9 @@ test('the full approval flow: plan, scoped edits, commit, one-time push', async 
   writeFiles(dir, { 'src/a/x.ts': 'export const x = 1;\n' });
   git(dir, ['add', 'src/a/x.ts', 'docs/changes/c1.md']);
   assert.equal((await bash(dir, 'git commit -m "feat: add x"')).code, 2, 'commit not approved');
+  assert.match((await prompt(dir, 'next?')).stdout, /then owner: \/keel:approve commit/);
   assert.match((await prompt(dir, '/keel:approve commit')).stdout, /commit approved/);
+  assert.match((await prompt(dir, 'next?')).stdout, /approved exactly the staged changes: commit them now/);
   assert.equal((await bash(dir, 'git commit -m "feat: add x"')).code, 0);
   writeFiles(dir, { 'src/a/x.ts': 'export const x = 2;\n' });
   git(dir, ['add', 'src/a/x.ts']);
@@ -100,6 +102,7 @@ test('the full approval flow: plan, scoped edits, commit, one-time push', async 
 
   assert.equal((await bash(dir, 'git push -u origin feat/thing')).code, 2, 'no token yet');
   assert.match((await prompt(dir, '/keel:approve pr')).stdout, /pr approved/);
+  assert.match((await prompt(dir, 'next?')).stdout, /push this branch once/);
   assert.equal((await bash(dir, 'git push -u origin feat/thing')).code, 0);
   assert.equal((await bash(dir, 'git push -u origin feat/thing')).code, 2, 'the token is used up');
   assert.equal((await bash(dir, 'gh pr create --fill')).code, 0, 'one pull request per token');

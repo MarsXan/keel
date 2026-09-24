@@ -1,10 +1,11 @@
 // @ts-check
 /** `keel status` and the one-line reminders: the active change, its approvals, the next gate. */
-import { lastGreen } from './approvals.js';
-import { changeHash } from './artifacts.js';
+import { hasToken, lastGreen } from './approvals.js';
+import { branchHash, changeHash } from './artifacts.js';
 import { section, tierRank } from './changefile.js';
 import { approvalQueries, buildContext } from './context.js';
-import { shortHash } from './hash.js';
+import { isRepo, stagedDiff } from './git.js';
+import { sha256, shortHash } from './hash.js';
 
 /**
  * @typedef {import('./context.js').GuardContext} GuardContext
@@ -26,7 +27,27 @@ export function nextGate(ctx) {
   if (rank >= 1 && !isApproved('plan', changeHash(ch.parsed, 'plan'))) {
     return section(ch.parsed, 'Design') && section(ch.parsed, 'Tasks') ? 'owner: /keel:approve plan' : 'write Design and Tasks';
   }
-  return rank === 0 ? 'make the change, keel check, then owner: /keel:approve commit' : 'build under the plan, keel check, then owner: /keel:approve commit';
+  return (
+    shipGate(ctx, isApproved) ??
+    (rank === 0 ? 'make the change, run keel check, stage it, then owner: /keel:approve commit' : 'build under the plan, run keel check, stage the changes, then owner: /keel:approve commit')
+  );
+}
+
+/**
+ * The commit/push step, when the working tree has reached it.
+ * @param {GuardContext} ctx
+ * @param {(what: string, hash: string) => boolean} isApproved
+ */
+function shipGate(ctx, isApproved) {
+  if (!isRepo(ctx.root)) return null;
+  const staged = stagedDiff(ctx.root);
+  if (staged.trim()) {
+    return isApproved('commit', sha256(staged))
+      ? 'the owner approved exactly the staged changes: commit them now with a plain git commit -m "…"'
+      : 'show the owner `git diff --cached --stat`, then owner: /keel:approve commit';
+  }
+  const token = hasToken(ctx.root, { what: 'pr', action: 'push', hash: branchHash(ctx.root, ctx.config.project.baseBranch) });
+  return token ? 'the owner issued a one-time token: push this branch once and open one pull request' : null;
 }
 
 /**
