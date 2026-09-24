@@ -47,6 +47,7 @@ function sessionStart(_input, ctx) {
   if (rules.length > 0) lines.push('Red lines:', ...rules.slice(0, 10));
   const recent = ctx.change ? readLedger(ctx.root, ctx.change.id, 8) : [];
   if (recent.length > 0) lines.push(`Recent ledger for ${ctx.change?.id} (handoff):`, ...recent);
+  lines.push('Disciplines (skills): keel:tdd before writing or changing code, keel:search-first before adding a function, file or dependency, keel:evidence before saying anything is done or passing, keel:escalate when a rule, test or requirement blocks you.');
   lines.push('If a rule blocks you and you cannot comply, reply with a line starting "ESCALATE:" instead of working around it.');
   return { code: 0, stdout: context('SessionStart', clip(lines.join('\n'), 5000)) };
 }

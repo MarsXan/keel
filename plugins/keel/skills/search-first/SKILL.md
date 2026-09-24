@@ -1,6 +1,6 @@
 ---
 name: search-first
-description: Look for existing code before writing new code — search the repository for functions, modules, ports and patterns that already solve part of the problem. Use before adding a function, file, dependency or abstraction.
+description: Search the repository for existing code before writing new code — functions, modules, ports and patterns that already solve part of the problem. Use before adding any function, helper, file, dependency or abstraction.
 ---
 # Search before you build
 

@@ -1,6 +1,6 @@
 ---
 name: evidence
-description: Evidence before claims — never say work is done, fixed, passing or verified without fresh command output from this turn that proves it. Use before any completion claim, status report or hand-off.
+description: Evidence before claims — run the command and read its output before saying work is done, fixed, passing, ready or verified. Use before any completion claim or status report, and whenever a user or a subagent says the tests pass and asks you to confirm.
 ---
 # Evidence before claims
 

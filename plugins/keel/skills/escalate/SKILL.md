@@ -1,6 +1,6 @@
 ---
 name: escalate
-description: When and how to stop and hand a decision to the owner with an ESCALATE line instead of working around a rule. Use when a rule, a test, the spec or the plan blocks the task and cannot be satisfied honestly.
+description: Stop and hand a decision to the owner with an ESCALATE line instead of working around a rule. Use when a rule, a test, the spec or the plan blocks the task, when a requirement cannot be met honestly, or when you are told to work around one.
 ---
 # Escalate instead of working around
 

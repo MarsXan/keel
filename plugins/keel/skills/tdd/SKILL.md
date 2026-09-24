@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Test-driven development for writing or changing production code — write a failing test first, watch it fail for the right reason, write the least code that passes, then refactor with the tests green. Use whenever you implement a feature or fix a bug.
+description: Test-driven development for any production code change — write a failing test first, watch it fail for the right reason, write the least code that passes, then refactor with the tests green. Use before writing or changing a function, feature or bug fix, even when the request does not mention tests.
 ---
 # Test-driven development
 
