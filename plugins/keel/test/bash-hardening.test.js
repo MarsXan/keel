@@ -231,3 +231,13 @@ test('read-only roles: git global options and listing-only subcommands', () => {
     assert.equal(decide(c, role), 'deny', c);
   }
 });
+
+test('git config and git remote writes cannot pass as reads (git stops parsing options at the first operand)', () => {
+  for (const c of ['git config core.hooksPath /tmp/nohooks --get', 'git -C . config core.fsmonitor ./x.sh --get', 'git config user.name x', 'git config --add k v', 'git remote -v add evil https://example.com/r.git', 'git remote --verbose set-url origin https://example.com/r.git']) {
+    assert.equal(decide(c), 'deny', c);
+    assert.equal(decide(c, { role: 'keel:reviewer-risk' }), 'deny', `${c} (read-only role)`);
+  }
+  for (const c of ['git config --get user.name', 'git config get user.name', 'git config --global --get core.editor', 'git config --file .gitmodules --get submodule.x.url', 'git config user.name', 'git remote -v', 'git remote get-url origin']) {
+    assert.equal(decide(c), 'allow', c);
+  }
+});

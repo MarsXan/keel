@@ -40,6 +40,46 @@ const SECRET_READING = new Set(['add', 'diff', 'show', 'log', 'blame', 'grep', '
 const SAFE_CONFIG = /^(color(\..+)?|core\.(quotepath|autocrlf|safecrlf)|advice\..+|format\.(pretty|subjectprefix|numbered)|status\..+|log\.(date|decorate|abbrevcommit|showsignature|follow)|user\.(name|email)|author\.(name|email)|committer\.(name|email)|commit\.(gpgsign|verbose|cleanup)|init\.defaultbranch|merge\.conflictstyle|rerere\.enabled|safe\.directory|column\..+|i18n\..+|grep\.(patterntype|linenumber|column)|blame\.(date|coloring)|feature\..+|fetch\.parallel)$/i;
 const GIT_ENV_OVERRIDES = /^(SKIP|GIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|EXEC_PATH|TEMPLATE_DIR|NAMESPACE))$/;
 
+/** Options of git config that take the next argument as their value. */
+const CONFIG_VALUE_OPTIONS = new Set(['-f', '--file', '--blob', '--type', '--default', '--comment', '--value']);
+
+/**
+ * Index of the first operand, skipping options and the values of value-taking options.
+ * @param {string[]} args
+ * @param {Set<string>} [valueOptions]
+ */
+function operandIndex(args, valueOptions = new Set()) {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--') return i + 1 < args.length ? i + 1 : -1;
+    if (!args[i].startsWith('-')) return i;
+    if (valueOptions.has(args[i])) i++;
+  }
+  return -1;
+}
+
+/** The first operand (a subcommand such as `add`), or null. @param {string[]} args */
+export function firstOperand(args) {
+  const i = operandIndex(args);
+  return i < 0 ? null : args[i];
+}
+
+/**
+ * Whether `git config <args>` only reads. Git parses options only up to the first operand,
+ * so `git config key value --get` sets the key: a read needs a leading --get or --list, the
+ * `get` or `list` subcommand, or a lone key.
+ * @param {string[]} args
+ */
+export function configReads(args) {
+  const i = operandIndex(args, CONFIG_VALUE_OPTIONS);
+  const leading = i < 0 ? args : args.slice(0, i);
+  const operands = i < 0 ? [] : args.slice(i);
+  if (leading.some((a) => /^(--add|--unset(-all)?|--replace-all|--rename-section|--remove-section|--edit|-e)$/.test(a))) return false;
+  if (operands[0] === 'get' || operands[0] === 'list') return true;
+  if (['set', 'unset', 'rename-section', 'remove-section', 'edit'].includes(operands[0] ?? '')) return false;
+  if (leading.some((a) => /^(--get(-all|-regexp|-urlmatch|-color|-colorbool)?|--list|-l)$/.test(a))) return true;
+  return operands.length === 1;
+}
+
 /**
  * @param {string[]} argv
  * @returns {{ sub: string | null, at: number, configs: string[], dirs: string[], other: string[] }}
@@ -132,10 +172,8 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
       return pushRule(args, dyn, ctx);
     case 'stash':
       return deny('git stash is not allowed: it hides work from the owner and from Keel. Commit, or keep the changes in the working tree.');
-    case 'config': {
-      const readOnly = has(/^(--get(-all|-regexp|-urlmatch|-color|-colorbool)?|--list|-l)$/) || ['get', 'list'].includes(args[0]);
-      return readOnly ? null : deny('Changing git configuration is not allowed. Ask the owner if a setting must change.');
-    }
+    case 'config':
+      return configReads(args) ? null : deny('Changing git configuration is not allowed. Ask the owner if a setting must change.');
     case 'reset':
       return resetRule(args, cwd, ctx, touchesGuarded);
     case 'clean':
@@ -166,8 +204,10 @@ function subcommandRule(sub, args, dyn, cwd, ctx, evaluateNested) {
       return args.every((a) => ['--refresh', '--really-refresh', '-q', '--ignore-missing', '--unmerged'].includes(a))
         ? null
         : deny('git update-index can hide changes from git status (skip-worktree, assume-unchanged) or rewrite the index; not allowed.');
-    case 'remote':
-      return ['add', 'set-url', 'rename', 'remove', 'rm', 'set-head', 'set-branches'].includes(args[0]) ? deny(`git remote ${args[0]} changes the repository configuration; that is the owner's call.`) : null;
+    case 'remote': {
+      const verb = firstOperand(args);
+      return verb && !['show', 'get-url'].includes(verb) ? deny(`git remote ${verb} changes the repository configuration; that is the owner's call.`) : null;
+    }
     case 'worktree':
       return args[0] === 'remove' && has(/^(-f|--force)$/) ? deny('Force-removing a worktree discards its uncommitted work.') : null;
     case 'gc':

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import * as gitHistory from '../lib/git-history.js';
@@ -104,4 +104,15 @@ test('git aliases are resolved', () => {
   git(dir, ['config', 'alias.p', 'push']);
   assert.equal(gitLib.alias(dir, 'p'), 'push');
   assert.equal(gitLib.alias(dir, 'nope'), null);
+});
+
+test("Keel's own git never runs a repository's fsmonitor program", () => {
+  const dir = gitRepo({ files: { 'a.ts': '1' }, commit: true });
+  const marker = join(dir, 'fsmonitor-ran');
+  writeFileSync(join(dir, 'monitor.sh'), `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 });
+  git(dir, ['config', 'core.fsmonitor', join(dir, 'monitor.sh')]);
+  writeFileSync(join(dir, 'a.ts'), '2');
+  assert.deepEqual(gitLib.changedFiles(dir).map((f) => f.path).sort(), ['a.ts', 'monitor.sh']);
+  gitLib.worktreeFingerprint(dir);
+  assert.equal(existsSync(marker), false);
 });

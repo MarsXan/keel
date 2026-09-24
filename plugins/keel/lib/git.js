@@ -45,7 +45,9 @@ function gitEnv() {
  */
 export function run(cwd, args, opts = {}) {
   try {
-    return execFileSync('git', ['-c', 'core.quotepath=off', ...args], {
+    // A repository's core.fsmonitor names a program git would run on status; Keel's own git
+    // runs outside the sandbox, so it never uses one.
+    return execFileSync('git', ['-c', 'core.quotepath=off', '-c', 'core.fsmonitor=false', ...args], {
       cwd,
       encoding: 'utf8',
       input: opts.input,

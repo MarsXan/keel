@@ -6,7 +6,7 @@
  */
 import { commandName } from '../shell-wrappers.js';
 import { deny } from './decision.js';
-import { parseGit } from './git-rules.js';
+import { configReads, firstOperand, parseGit } from './git-rules.js';
 
 export const READ_ONLY_ROLES = new Set(['keel:explorer', 'keel:planner', 'keel:verifier', 'keel:reviewer-spec', 'keel:reviewer-standards', 'keel:reviewer-risk', 'keel:auditor']);
 const WRITERS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'srm', 'trash', 'mv', 'cp', 'tee', 'dd', 'truncate', 'touch', 'chmod', 'chown', 'chgrp', 'ln', 'install', 'mkdir', 'patch']);
@@ -19,10 +19,10 @@ const TAG_WRITES = /^(-[dasfmFu]|--(delete|annotate|sign|force|message|file|loca
 const LISTING = {
   branch: (args) => !args.some((a) => BRANCH_WRITES.test(a)) && (args.every((a) => a.startsWith('-')) || args.includes('-l') || args.includes('--list')),
   tag: (args) => !args.some((a) => TAG_WRITES.test(a)) && (args.length === 0 || args.includes('-l') || args.includes('--list')),
-  remote: (args) => args.length === 0 || ['-v', '--verbose', 'show', 'get-url'].includes(args[0]),
+  remote: (args) => ['show', 'get-url', null].includes(firstOperand(args)),
   stash: (args) => ['list', 'show'].includes(args[0] ?? ''),
   worktree: (args) => args[0] === 'list',
-  config: (args) => args.some((a) => ['--get', '--get-all', '--get-regexp', '--list', '-l'].includes(a)) && !args.some((a) => /^(--(add|unset|unset-all|replace-all|rename-section|remove-section|edit)|-e)$/.test(a)),
+  config: configReads,
 };
 
 /**
