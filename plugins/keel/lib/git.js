@@ -65,6 +65,18 @@ export function topLevel(cwd) {
   return run(cwd, ['rev-parse', '--show-toplevel'], { allowFail: true })?.trim() || null;
 }
 
+/**
+ * Files git keeps under a project directory: tracked ones, and untracked ones it does not
+ * ignore. Paths are relative to the project root.
+ * @param {string} root
+ * @param {string} rel
+ * @returns {string[]}
+ */
+export function filesUnder(root, rel) {
+  const out = run(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', rel || '.'], { allowFail: true });
+  return out === null ? [] : [...new Set(out.split('\0').filter(Boolean))];
+}
+
 /** @param {string} root */
 export function isRepo(root) {
   return run(root, ['rev-parse', '--is-inside-work-tree'], { allowFail: true })?.trim() === 'true';

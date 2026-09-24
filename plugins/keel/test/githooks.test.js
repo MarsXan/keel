@@ -108,6 +108,9 @@ test('reference-transaction: even with --no-verify, only approved commits land a
   writeFiles(dir, { 'src/a.ts': '6\n' });
   assert.match(agent(['stash']).stderr, /refs\/stash/);
   assert.equal(agent(['checkout', '-q', '-b', 'feat/new']).status, 0, 'a new branch at an existing commit is fine');
+  assert.equal(agent(['bisect', 'start']).status, 0);
+  assert.equal(agent(['bisect', 'bad']).status, 0, 'bisect markers are bookkeeping, not history');
+  assert.equal(agent(['bisect', 'reset']).status, 0);
   const owner = spawnSync('git', ['commit', '-qam', 'owner'], { cwd: dir, env: { ...process.env, CLAUDECODE: '' }, encoding: 'utf8' });
   assert.equal(owner.status, 0, owner.stderr);
 });

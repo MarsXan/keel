@@ -5,7 +5,7 @@ import { branchHash, stagedHash } from '../artifacts.js';
 import { runChecks } from '../checks.js';
 import { approvalQueries, readText } from '../context.js';
 import { readdirSync } from 'node:fs';
-import { alias, currentBranch } from '../git.js';
+import { alias, currentBranch, filesUnder } from '../git.js';
 import { pushDestination } from '../git-history.js';
 import { context, ESCALATE_HINT, preToolUse } from '../io.js';
 import { classifier, toRel } from '../paths.js';
@@ -13,7 +13,7 @@ import { evaluateBash } from '../policy/bash.js';
 import { packagesOf } from '../policy/diffaudit.js';
 import { evaluateEdit, shellWriteRule } from '../policy/edit.js';
 import { loadShellSnapshot } from '../shell-snapshot.js';
-import { recordTransitions, taskState } from '../tasks.js';
+import { loneTaskProblem, recordTransitions, taskState } from '../tasks.js';
 import { join, resolve } from 'node:path';
 
 /**
@@ -33,6 +33,8 @@ function answer(d) {
 function bashGuard(input, ctx, env) {
   const command = input.tool_input?.command;
   if (typeof command !== 'string') return { code: 2, stderr: 'keel: this shell call has no command string, so it cannot be checked.\n' };
+  const lone = loneTaskProblem(command);
+  if (lone) return answer({ decision: 'deny', reason: lone });
   const { changeId, isApproved } = approvalQueries(ctx);
   const base = ctx.config.project.baseBranch;
   /** @type {string | undefined} */
@@ -67,6 +69,7 @@ function bashGuard(input, ctx, env) {
     shell: loadShellSnapshot(ctx.home, env),
     role,
     writeRule: (rel) => shellWriteRule(rel, role, (edits ??= editContext(ctx))),
+    filesUnder: (rel) => filesUnder(ctx.root, rel),
   });
   if (d.decision === 'allow') {
     const refused = recordTransitions(command, ctx);

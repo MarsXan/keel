@@ -52,4 +52,17 @@ test('under an approved plan: frozen tests, undeclared files, heavy paths, roles
   assert.equal(undeclared.code, 0);
   assert.equal(JSON.parse(undeclared.stdout).hookSpecificOutput.permissionDecision, 'ask');
   assert.match((await bash(dir, 'echo "- plan approved" >> docs/changes/c1.md')).stderr, /Change files are edited with the Edit tool/);
+  assert.match((await bash(dir, 'rm src/a/*.test.ts')).stderr, /rm src\/a\/\*\.test\.ts would delete src\/a\/x\.test\.ts/, 'globs are expanded');
+  assert.match((await bash(dir, 'rm -r src/a')).stderr, /would delete src\/a\/x\.test\.ts/, 'files under a deleted directory are checked');
+  assert.equal((await bash(dir, 'rm -rf dist/* node_modules')).code, 0);
+});
+
+test('keel task runs on its own, so a stage is recorded only for what ran', async () => {
+  const dir = repo({ 'docs/changes/c1.md': CHANGE });
+  assert.equal((await runCli(['use', 'c1'], { cwd: dir, env: { CLAUDE_PROJECT_DIR: dir } })).code, 0);
+  await guard(dir, 'prompt', { prompt: '/keel:approve plan' });
+  for (const command of ['false && keel task T-1 red', 'keel task T-1 red && echo ok', 'cd . ; keel task T-1 red']) {
+    assert.match((await bash(dir, command)).stderr, /Run `keel task <T-n> <stage>` on its own/, command);
+  }
+  assert.equal((await bash(dir, 'keel task T-1 red')).code, 0);
 });

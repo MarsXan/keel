@@ -83,6 +83,24 @@ export function taskInvocations(command) {
 }
 
 /**
+ * A task stage is recorded before its command runs, so `keel task` must be the whole
+ * command: inside a longer one it might never run (`false && keel task …`) or wait for an
+ * owner prompt that is denied.
+ * @param {string} command
+ * @returns {string | null}
+ */
+export function loneTaskProblem(command) {
+  if (taskInvocations(command).length === 0) return null;
+  let count;
+  try {
+    count = parseCommands(command).commands.length;
+  } catch {
+    return null;
+  }
+  return count === 1 ? null : 'Run `keel task <T-n> <stage>` on its own, not inside a longer command, so Keel records exactly what ran.';
+}
+
+/**
  * Called by the bash guard for an allowed command: records each task transition it contains
  * in the trusted store, freezing the changed tests when a task turns green.
  * @param {string} command

@@ -44,7 +44,7 @@ const GIT_ENV_OVERRIDES = /^(SKIP|GIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTO
  * @param {string[]} argv
  * @returns {{ sub: string | null, at: number, configs: string[], dirs: string[], other: string[] }}
  */
-function parseGit(argv) {
+export function parseGit(argv) {
   const configs = [];
   const dirs = [];
   const other = [];

@@ -131,7 +131,7 @@ export async function gitHookCommand(args, io) {
 }
 
 const ZERO = /^0+$/;
-const ALLOWED_REFS = /^(HEAD|ORIG_HEAD|FETCH_HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|REBASE_HEAD|AUTO_MERGE|BISECT_\w+|refs\/remotes\/.+|refs\/prefetch\/.+|refs\/worktree\/.+)$/;
+const ALLOWED_REFS = /^(HEAD|ORIG_HEAD|FETCH_HEAD|MERGE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD|REBASE_HEAD|AUTO_MERGE|BISECT_\w+|refs\/bisect\/.+|refs\/remotes\/.+|refs\/prefetch\/.+|refs\/worktree\/.+)$/;
 
 /**
  * Every ref update in an agent session: new commits may land on a branch only when the

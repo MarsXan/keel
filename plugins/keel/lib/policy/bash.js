@@ -11,13 +11,14 @@ import { parseCommands, ShellParseError } from '../shell.js';
 import { emptyShell } from '../shell-snapshot.js';
 import { commandName } from '../shell-wrappers.js';
 import { DANGER } from './code-scan.js';
-import { guardedWrite, isWriteCommand, outwardRule, removeRule, secretRule, writeTargets } from './command-rules.js';
+import { guardedWrite, isWriteCommand, outwardRule, secretRule, writeTargets } from './command-rules.js';
 import { combine, deny } from './decision.js';
 import { ghRule } from './gh-rules.js';
 import { gitRule } from './git-rules.js';
 import { roleRule } from './role-rules.js';
 import { findRule, interpreterRule, packageScriptRule, scriptRule, xargsRule } from './script-rules.js';
 import { claudeRule, declareRule, definitionRule, envProblem, keelRule, privilegeRule } from './session-rules.js';
+import { removeRule } from './remove-rules.js';
 
 /**
  * @typedef {import('../shell.js').SimpleCommand} SimpleCommand
@@ -43,6 +44,7 @@ import { claudeRule, declareRule, definitionRule, envProblem, keelRule, privileg
  * @property {Set<string>} [expanding] aliases being expanded (stops alias loops)
  * @property {string} [role] agent_type of the caller ('' for the main session)
  * @property {(rel: string) => Decision | null} [writeRule] the Edit tool's path rules for a project path the command writes
+ * @property {(rel: string) => string[]} [filesUnder] project files git keeps (tracked or not ignored) under a directory
  * @typedef {{ commands: number, started: number, seen: Set<string> }} Budget
  * @typedef {BashContext & { classify: import('../paths.js').Classifier, cwdKnown: boolean, startCwd: string, depth: number, budget: Budget, shell: import('../shell-snapshot.js').ShellDefinitions, listDir: (abs: string) => string[] | null, expanding: Set<string> }} CommandContext
  */

@@ -221,3 +221,13 @@ test('read-only roles may run checks but never change the repository', () => {
   }
   assert.equal(decide('rm notes.md', { role: 'keel:implementer' }), 'allow', 'workers are not read-only');
 });
+
+test('read-only roles: git global options and listing-only subcommands', () => {
+  const role = { role: 'keel:verifier' };
+  for (const c of ['git -C . log', 'git -c color.ui=never diff main', 'git -C /tmp/x diff main', 'git branch -a', "git branch --list 'feat/*'", 'git remote -v', 'git config --get user.name', 'git tag', 'git worktree list']) {
+    assert.equal(decide(c, role), 'allow', c);
+  }
+  for (const c of ['git branch scratch', 'git branch --delete topic', 'git branch -m old new', 'git tag v1', 'git remote add x y', 'git stash push', 'git config user.name x', 'git worktree add ../x', 'git -C . commit -m x']) {
+    assert.equal(decide(c, role), 'deny', c);
+  }
+});

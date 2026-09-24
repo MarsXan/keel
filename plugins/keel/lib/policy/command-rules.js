@@ -14,54 +14,10 @@ import { ask, deny } from './decision.js';
  * @typedef {import('./bash.js').CommandContext} CommandContext
  */
 
-const TEMP = ['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'];
 /** Home-directory files that configure the shell, git or Claude Code. */
 const HOME_GUARDED = ['.gitconfig', '.config/git/**', '.zshrc', '.zshenv', '.zprofile', '.zlogin', '.bashrc', '.bash_profile', '.profile', '.claude/**', '.claude.json', '.ssh/**', '.config/gh/**'];
 const WRITE_TARGETS = new Set(['cp', 'mv', 'install', 'ln', 'rsync', 'dd', 'truncate', 'touch', 'chmod', 'chown', 'chgrp', 'chflags', 'xattr', 'setfacl', 'tee', 'sed', 'perl', 'ruby', 'gawk', 'curl', 'wget', 'unzip', 'tar', 'patch']);
 const SECRET_SAFE = new Set(['ls', 'stat', 'file', 'test', '[', '[[', 'find', 'fd', 'basename', 'dirname', 'realpath', 'readlink', 'echo', 'printf', 'git', 'mkdir', 'which', 'type', 'command']);
-
-/** Targets that mean "everything": the working directory, its parent, the filesystem root, home. */
-const EVERYTHING = new Set(['.', './', '..', '../', '/', '~', '~/', '*', '.*', './*', '/*', '~/*']);
-
-/**
- * `rm` and friends. Deleting ordinary project folders (dist, coverage) is fine; deleting the
- * project root, git's data, guarded paths, anything outside the project (temporary
- * directories excepted), or a recursive delete of a path computed at run time is not.
- * @param {SimpleCommand} cmd
- * @param {CommandContext} ctx
- */
-export function removeRule(cmd, ctx) {
-  const args = cmd.argv.slice(1);
-  let recursive = false;
-  /** @type {{ word: string, dynamic: boolean }[]} */
-  const targets = [];
-  let options = true;
-  args.forEach((a, i) => {
-    if (options && a === '--') options = false;
-    else if (options && a.startsWith('--')) recursive ||= a === '--recursive';
-    else if (options && a.startsWith('-') && a.length > 1) recursive ||= /[rR]/.test(a);
-    else targets.push({ word: a, dynamic: cmd.dynamic[i + 1] });
-  });
-  for (const { word, dynamic } of targets) {
-    if (EVERYTHING.has(word)) return deny(`rm ${word} would delete the project, its parent, the home directory or everything. Delete specific paths.`);
-    if (dynamic) {
-      if (recursive) return deny(`Recursive delete of a path computed at run time (${word}) is not allowed; write the path out.`);
-      continue;
-    }
-    const abs = realPath(resolvePath(ctx.cwd, word, ctx.home));
-    const rel = ctx.classify.rel(abs);
-    if (rel === '' || `${ctx.root}/`.startsWith(`${abs}/`)) return deny(`rm ${word} would delete the project itself.`);
-    if (rel !== null && (ctx.classify.touchesProtected(rel) || rel === '.git' || rel.startsWith('.git/'))) {
-      return deny(`Deleting ${word} would remove a protected Keel path or git's own data.`);
-    }
-    const gated = rel !== null ? pathGate(rel, ctx, `rm ${word} would delete ${rel}`) : null;
-    if (gated) return gated;
-    if (recursive && rel === null && !TEMP.some((p) => `${abs}/`.startsWith(p))) {
-      return deny(`Recursive delete outside the project (${word}) is not allowed.`);
-    }
-  }
-  return null;
-}
 
 /**
  * Paths a command writes to, for the commands Keel knows.
@@ -192,7 +148,7 @@ export function guardedWrite(targets, ctx, how) {
  * @param {string} what how the path is written, for the message
  * @returns {Decision | null}
  */
-function pathGate(rel, ctx, what) {
+export function pathGate(rel, ctx, what) {
   const d = ctx.writeRule?.(rel) ?? null;
   return d && d.decision !== 'allow' ? { decision: d.decision, reason: `${what}. ${d.reason}` } : null;
 }
@@ -235,7 +191,7 @@ export function secretRule(cmd, name, ctx) {
  * @param {CommandContext} ctx
  * @returns {string[]}
  */
-function expandGlob(word, ctx) {
+export function expandGlob(word, ctx) {
   if (/[$`]/.test(word) || !/[*?[]/.test(word)) return [];
   const slash = word.lastIndexOf('/');
   const dirPart = slash >= 0 ? word.slice(0, slash) || '/' : '.';
