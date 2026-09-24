@@ -16,7 +16,7 @@ export class GitError extends Error {
   }
 }
 
-const DIFF_FLAGS = ['--no-ext-diff', '--no-textconv', '--no-color', '--binary', '--full-index', '--relative'];
+export const DIFF_FLAGS = ['--no-ext-diff', '--no-textconv', '--no-color', '--binary', '--full-index', '--relative'];
 
 function gitEnv() {
   return { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' };
@@ -86,7 +86,7 @@ export function currentBranch(root) {
 }
 
 /** Directory of the project root below the git top level, e.g. "svc/" or "". @param {string} root */
-function prefix(root) {
+export function prefix(root) {
   return run(root, ['rev-parse', '--show-prefix'], { allowFail: true })?.trim() ?? '';
 }
 
@@ -139,11 +139,23 @@ function statusOf(xy) {
  * @returns {Map<string, string | null>}
  */
 export function headContents(root, rels) {
+  if (!hasHead(root)) return new Map(rels.map((rel) => [rel, null]));
+  return contentsAt(root, 'HEAD', rels);
+}
+
+/**
+ * Content of project-relative paths at a revision, read in one batch; missing files map to null.
+ * @param {string} root
+ * @param {string} rev
+ * @param {string[]} rels
+ * @returns {Map<string, string | null>}
+ */
+export function contentsAt(root, rev, rels) {
   /** @type {Map<string, string | null>} */
   const result = new Map(rels.map((rel) => [rel, null]));
-  if (rels.length === 0 || !hasHead(root)) return result;
+  if (rels.length === 0) return result;
   const pre = prefix(root);
-  const input = rels.map((rel) => `HEAD:${pre}${rel}\n`).join('');
+  const input = rels.map((rel) => `${rev}:${pre}${rel}\n`).join('');
   let out;
   try {
     out = execFileSync('git', ['cat-file', '--batch'], { cwd: root, input, env: gitEnv(), maxBuffer: 512 * 1024 * 1024 });
@@ -175,19 +187,6 @@ export function stagedDiff(root) {
   return run(root, ['diff', '--cached', ...DIFF_FLAGS]);
 }
 
-/** The empty tree, the parent of a root commit. */
-const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-
-/**
- * Diff of one commit against its parent, in the same form as stagedDiff.
- * @param {string} root
- * @param {string | null} parent
- * @param {string} commit
- */
-export function commitDiff(root, parent, commit) {
-  return run(root, ['diff', parent ?? EMPTY_TREE, commit, ...DIFF_FLAGS]);
-}
-
 /** Tracked changes in the working tree and index against HEAD. @param {string} root */
 export function trackedDiff(root) {
   if (hasHead(root)) return run(root, ['diff', 'HEAD', ...DIFF_FLAGS]);
@@ -216,45 +215,10 @@ function fileHash(abs) {
   }
 }
 
-/**
- * The commit where HEAD's branch left `base` (tries `base`, then `origin/<base>`).
- * @param {string} root
- * @param {string} base
- */
-export function mergeBase(root, base) {
-  for (const candidate of [base, `origin/${base}`]) {
-    const mb = run(root, ['merge-base', candidate, 'HEAD'], { allowFail: true })?.trim();
-    if (mb) return mb;
-  }
-  return null;
-}
-
-/**
- * Committed changes on the current branch since it left `base`, or null when there is no
- * merge base (no such branch, or no commits).
- * @param {string} root
- * @param {string} base
- */
-export function branchDiff(root, base) {
-  const mb = mergeBase(root, base);
-  return mb ? run(root, ['diff', mb, 'HEAD', ...DIFF_FLAGS]) : null;
-}
-
 /** Expansion of a git alias, or null. @param {string} root @param {string} name */
 export function alias(root, name) {
   if (!/^[\w.-]+$/.test(name)) return null;
   return run(root, ['config', '--get', `alias.${name}`], { allowFail: true })?.trim() || null;
-}
-
-/**
- * The branch a bare `git push` would update (from `@{push}`), falling back to the current
- * branch when no push destination is configured yet.
- * @param {string} root
- */
-export function pushDestination(root) {
-  const target = run(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{push}'], { allowFail: true })?.trim();
-  if (target) return target.includes('/') ? target.slice(target.indexOf('/') + 1) : target;
-  return currentBranch(root);
 }
 
 /**

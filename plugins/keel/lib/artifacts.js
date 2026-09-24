@@ -1,7 +1,8 @@
 // @ts-check
 /** Hashes of what each kind of owner approval is bound to. */
 import { artifactText } from './changefile.js';
-import { branchDiff, commitDiff, headSha, mergeBase, stagedDiff, worktreeFingerprint } from './git.js';
+import { headSha, stagedDiff, worktreeFingerprint } from './git.js';
+import { branchDiff, commitDiff, mergeBase } from './git-history.js';
 import { sha256 } from './hash.js';
 
 /**

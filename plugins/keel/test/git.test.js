@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import * as gitHistory from '../lib/git-history.js';
 import * as gitLib from '../lib/git.js';
 import { git, gitRepo, tmpDir } from './helpers.js';
 
@@ -93,8 +94,8 @@ test('branch diff is taken from the merge base with the base branch', () => {
   git(dir, ['checkout', '-q', '-b', 'feat/x']);
   writeFileSync(join(dir, 'a.ts'), '2');
   git(dir, ['commit', '-qam', 'change']);
-  assert.match(gitLib.branchDiff(dir, 'main') ?? '', /\+2/);
-  assert.equal(gitLib.branchDiff(dir, 'no-such-branch'), null);
+  assert.match(gitHistory.branchDiff(dir, 'main') ?? '', /\+2/);
+  assert.equal(gitHistory.branchDiff(dir, 'no-such-branch'), null);
   assert.equal(gitLib.currentBranch(dir), 'feat/x');
 });
 
