@@ -21,6 +21,8 @@ const PHRASES = {
   ship: [/## Deltas/, /\/keel:approve commit/, /\/keel:approve pr/, /Never merge, tag or release/, /--no-verify/],
   spike: [/throwaway|Throwaway/, /spike\//, /\/keel:approve plan/],
   amend: [/## Amendment/, /\/keel:approve amend/, /docs\/adr\//, /Guardrail-Change:/, /through Bash/],
+  audit: [/keel audit --metrics/, /keel:auditor/, /gh issue list/, /Never fix anything during the audit/],
+  lesson: [/cheapest check/, /\*\*Mechanism:\*\* `<path/, /enforced-by:/, /Never a memory\s+note/, /\/keel:amend/],
   approve: [/You cannot approve anything yourself/, /bound to content/, /one-time token/],
   status: [/keel status/],
 };
