@@ -4,9 +4,16 @@
   "private": true,
   "description": "Keel: a guardrailed agentic-coding harness for Claude Code (plugin marketplace)",
   "type": "module",
+  "license": "MIT",
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test 'plugins/*/test/*.test.js'",
-    "validate": "claude plugin validate . --strict && claude plugin validate plugins/keel --strict"
+    "typecheck": "tsc -p tsconfig.json",
+    "validate": "claude plugin validate . --strict && claude plugin validate plugins/keel --strict",
+    "check": "npm run typecheck && npm test && npm run validate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3"
   }
 }

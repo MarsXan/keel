@@ -31,6 +31,8 @@ const BANNED_PATTERNS = [
   '@Disabled\\b',
 ];
 
+/** @typedef {{ id: string, run: string, stages: string[], files?: string[], timeoutSec?: number }} Check */
+
 const DEFAULTS = {
   keel: '0.1',
   project: { name: '', baseBranch: 'main', protectedBranches: ['main'], github: { repo: '' } },
@@ -53,16 +55,13 @@ const DEFAULTS = {
   },
   packages: [],
   caps: { fileLines: 300, fileLinesByPath: {}, testFileLines: 600, prLines: 400, claudeMdLines: 120, ruleFileLines: 60 },
-  checks: [],
+  checks: /** @type {Check[]} */ ([]),
   tiers: { t1MaxFiles: 8 },
   models: {},
   bannedPatterns: BANNED_PATTERNS,
 };
 
-/**
- * @typedef {{ id: string, run: string, stages: string[], files?: string[], timeoutSec?: number }} Check
- * @typedef {typeof DEFAULTS & { checks: Check[] }} KeelConfig
- */
+/** @typedef {typeof DEFAULTS} KeelConfig */
 
 /** @type {KeelConfig} */
 export const DEFAULT_CONFIG = deepFreeze(structuredClone(DEFAULTS));

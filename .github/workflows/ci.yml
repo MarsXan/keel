@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dev tools (typescript, node types)
+        run: npm install --no-audit --no-fund
+      - name: Type-check the CLI (JSDoc, strict)
+        run: npm run typecheck
+      - name: Unit and guard tests
+        run: npm test
+      - name: Validate the marketplace and plugin manifests
+        run: |
+          npx --yes @anthropic-ai/claude-code plugin validate . --strict
+          npx --yes @anthropic-ai/claude-code plugin validate plugins/keel --strict
