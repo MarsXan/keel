@@ -1,0 +1,66 @@
+name: evals
+
+# Keel's pressure and trigger evals (spec §13), cost-capped. Nightly and on demand only.
+# Needs an ANTHROPIC_API_KEY secret; without one the job does nothing.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per case per arm
+        default: '1'
+      max_cost:
+        description: Cost ceiling in USD
+        default: '3'
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RUNS: ${{ inputs.runs || '1' }}
+      MAX_COST: ${{ inputs.max_cost || '3' }}
+    steps:
+      - name: Skip without an API key
+        id: key
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY secret: skipping the evals."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.key.outputs.skip != '1'
+        uses: actions/checkout@v4
+      - if: steps.key.outputs.skip != '1'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Bash-granting runs need Claude Code's OS sandbox: bubblewrap and socat, and user
+      # namespaces, which Ubuntu 24.04 restricts through AppArmor by default.
+      - name: Sandbox prerequisites
+        if: steps.key.outputs.skip != '1'
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq bubblewrap socat
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Install Claude Code
+        if: steps.key.outputs.skip != '1'
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Run the evals
+        if: steps.key.outputs.skip != '1'
+        working-directory: plugins/keel
+        run: |
+          claude plugin eval . --scaffold --trust-plugin --no-publish \
+            --allow-tools Bash Edit Write \
+            --model claude-sonnet-5 --judge-model claude-haiku-4-5 \
+            --runs "$RUNS" --max-cost-usd "$MAX_COST" --threshold 0.8 \
+            --json "$GITHUB_WORKSPACE/eval-results.json"
+      - if: always() && steps.key.outputs.skip != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results.json
+          if-no-files-found: ignore
