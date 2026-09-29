@@ -15,7 +15,7 @@ import { deny } from './decision.js';
 /** Variables that switch off git hooks, redirect git's configuration, or hide Claude Code/Keel. */
 export const BLOCKED_ENV = /^(HUSKY|HUSKY_SKIP_HOOKS|HUSKY_SKIP_INSTALL|LEFTHOOK|LEFTHOOK_SKIP|LEFTHOOK_EXCLUDE|PRE_COMMIT_ALLOW_NO_CONFIG|GIT_CONFIG_PARAMETERS|GIT_CONFIG_COUNT|GIT_CONFIG_(?:KEY|VALUE)_\d+|GIT_CONFIG_GLOBAL|GIT_CONFIG_SYSTEM|GIT_CONFIG_NOSYSTEM|GIT_EXTERNAL_DIFF|GIT_SSH_COMMAND|GIT_SSH|GIT_ASKPASS|SSH_ASKPASS|GIT_EDITOR|GIT_SEQUENCE_EDITOR|GIT_EXEC_PATH|GIT_TEMPLATE_DIR|CLAUDECODE|CLAUDE_CONFIG_DIR|CLAUDE_CODE_\w+|KEEL_\w+)$/;
 /** Pager variables may only name a plain pager: a pager command can run anything. */
-const PAGER_ENV = /^(GIT_PAGER|PAGER|MANPAGER|LESSOPEN|LESSCLOSE)$/;
+const PAGER_ENV = /^(GIT_PAGER|GH_PAGER|PAGER|MANPAGER|LESSOPEN|LESSCLOSE)$/;
 const SAFE_PAGERS = new Set(['', 'cat', 'less', 'more', 'less -R', 'less -FRX']);
 const DECLARE = new Set(['export', 'declare', 'typeset', 'readonly', 'local']);
 const PRIVILEGED = new Set(['sudo', 'doas', 'su', 'pkexec', 'runas']);

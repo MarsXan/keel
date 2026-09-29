@@ -19,6 +19,11 @@ import { allowUsing, deny } from './decision.js';
 
 const GH_TOP = new Set(['auth', 'browse', 'codespace', 'gist', 'issue', 'org', 'pr', 'project', 'release', 'repo', 'cache', 'run', 'workflow', 'alias', 'api', 'attestation', 'completion', 'config', 'extension', 'gpg-key', 'label', 'ruleset', 'search', 'secret', 'ssh-key', 'status', 'variable', 'help', 'version', 'co', '--version', '--help']);
 const TEMP = ['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'];
+/**
+ * Variables that choose the program gh starts (browser, editor), or the configuration it
+ * reads (aliases, editor, browser, pager), which a folder the agent writes could supply.
+ */
+const GH_ENV = /^(GH_BROWSER|BROWSER|GH_EDITOR|EDITOR|VISUAL|GH_CONFIG_DIR|XDG_CONFIG_HOME|HOME|GH_PATH)$/;
 /** @type {Word} */
 const HERE = { word: '.', dynamic: false };
 
@@ -29,6 +34,8 @@ const HERE = { word: '.', dynamic: false };
  */
 export function ghRule(cmd, ctx) {
   const [, group, sub, ...rest] = cmd.argv;
+  const setting = Object.keys(cmd.env).find((k) => GH_ENV.test(k));
+  if (setting) return deny(`${setting}=… is not allowed on gh: gh runs outside the sandbox, and ${setting} chooses a program it starts or the configuration (aliases, editor, browser) it reads.`);
   if (!group) return null;
   if (cmd.dynamic.slice(1, 3).some(Boolean)) return deny('The gh command or subcommand is computed at run time, so Keel cannot check it. Write it out literally.');
   if (!GH_TOP.has(group)) return deny(`gh ${group} is not a command Keel knows (it may be an alias or extension); use a built-in gh command.`);
@@ -154,6 +161,13 @@ function localWrites(command, words) {
       if (a.passthrough.length > 0) return { refuse: 'gh codespace cp passes options to scp, which runs outside the sandbox and can run programs; copy without them.' };
       const dest = a.operands.at(-1);
       return dest && !dest.word.startsWith('remote:') ? { targets: [dest], hint: '' } : null;
+    }
+    case 'codespace ssh': {
+      const a = parseArgs(words, ['-c', '--codespace', '--debug-file', '--profile', '-R', '--repo', '--repo-owner', '--server-port']);
+      // After `--` come ssh's options, then the remote command.
+      if (a.passthrough[0]?.word.startsWith('-')) return { refuse: 'gh codespace ssh passes options to ssh, which runs outside the sandbox and can run programs (ProxyCommand, LocalCommand); connect without them.' };
+      const debug = all(a, '--debug-file');
+      return debug.length > 0 ? { targets: debug, hint: '' } : null;
     }
     default:
       return null;

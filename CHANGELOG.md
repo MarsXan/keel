@@ -47,6 +47,12 @@ changes remove waiting without removing a guarantee. Spec:
   it back), and the secret rule did not see the file in it; it does now, for `curl -F` too.
   gh may not read a file whose name is computed at run time (`-F "k=@$F"`, `--input`,
   `--body-file`), since outside the sandbox nothing else would check it.
+- **Security:** `GH_BROWSER="sh evil.sh" gh browse` ran a program of the agent's choice
+  outside the sandbox. gh may not be given the variables that choose its browser or editor
+  or where it reads its configuration (`GH_BROWSER`, `BROWSER`, `GH_EDITOR`, `EDITOR`,
+  `VISUAL`, `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `HOME`, `GH_PATH`); `GH_PAGER` names a plain
+  pager, like `PAGER`; `gh codespace ssh` passes no ssh options (`ProxyCommand` runs a
+  program) and writes its `--debug-file` only where any command may write.
 - The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
   does not ask for a new sandbox test.
 

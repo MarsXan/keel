@@ -182,6 +182,25 @@ test('an @file field is a read, and gh may not read a file named at run time', (
   }
 });
 
+test('gh starts no program the agent chose: no browser, editor, pager or configuration of its own, no ssh options', () => {
+  for (const c of [
+    'GH_BROWSER="sh evil.sh" gh browse',
+    'BROWSER=./evil gh browse',
+    'GH_EDITOR=./evil gh pr edit 3',
+    'env GH_CONFIG_DIR=./cfg gh co 3',
+    'HOME=/tmp/h gh pr list',
+    'XDG_CONFIG_HOME=/tmp/c gh pr list',
+    'GH_PAGER="sh evil.sh" gh pr list',
+    'gh codespace ssh -c cs -- -o ProxyCommand=./evil',
+    'gh codespace ssh -c cs --debug-file .keel/state/log',
+  ]) {
+    assert.equal(decide(c, both), 'deny', c);
+  }
+  for (const c of ['gh browse', 'GH_PAGER=cat gh pr list', 'NO_COLOR=1 gh pr list', 'gh codespace ssh -c cs -- ls -la', 'gh codespace ssh -c cs --debug-file /tmp/ssh.log']) {
+    assert.equal(decide(c, both), 'allow', c);
+  }
+});
+
 test('destructive git commands are denied; read-only forms are allowed', () => {
   for (const c of [
     'git reset --hard HEAD~1',
