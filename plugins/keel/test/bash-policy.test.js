@@ -123,6 +123,46 @@ test('gh pr create needs the token, merges and self-approval are denied', () => 
   }
 });
 
+test('gh runs outside the sandbox, so where it writes files is checked as the sandbox would', () => {
+  for (const c of [
+    'gh run download 123', // into the project root, next to every guardrail file
+    'gh run download 123 -D .keel/state',
+    'gh run download 123 --dir=.claude',
+    'gh run download 123 -D.keel',
+    'gh run download 123 -n art -D ~/.config',
+    'gh run download 123 -D "$DIR"',
+    'gh release download v1',
+    'gh release download v1 -O .keel/state/approvals.jsonl',
+    'gh release download v1 --output=CLAUDE.md -D artifacts',
+    'gh repo clone owner/x .claude/skills/x',
+    'gh repo clone owner/.claude',
+    'gh repo clone https://github.com/owner/x.git /opt/x',
+    'gh repo clone owner/x dir -- --separate-git-dir=.keel/state/g',
+    'gh gist clone abc123 .keel/state/x',
+    'gh repo fork owner/x --clone --fork-name .claude',
+    'gh codespace cp -c cs remote:a .keel/state/approvals.jsonl',
+    'gh codespace cp -- -o ProxyCommand=sh remote:a b',
+  ]) {
+    assert.equal(decide(c, both), 'deny', c);
+  }
+  for (const c of [
+    'gh run download 123 -D artifacts',
+    'gh run download "$RUN" -D artifacts',
+    'gh run download 123 -D /tmp/artifacts',
+    'gh release download v1 -O -',
+    'gh release download v1 -D artifacts',
+    'gh repo clone owner/x',
+    'gh repo clone owner/x vendor/x',
+    'gh gist clone abc123',
+    'gh repo fork owner/x',
+    'gh repo fork owner/x --clone=false -- --depth 1',
+    'gh codespace cp -c cs notes.txt remote:notes.txt',
+  ]) {
+    assert.equal(decide(c), 'allow', c);
+  }
+  assert.match(evaluateBash('gh run download 123', ctx()).reason, /-D <dir>/);
+});
+
 test('destructive git commands are denied; read-only forms are allowed', () => {
   for (const c of [
     'git reset --hard HEAD~1',

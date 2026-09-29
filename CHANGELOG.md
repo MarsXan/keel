@@ -37,6 +37,12 @@ changes remove waiting without removing a guarantee. Spec:
   hashes cover the project's own diff, so staged files elsewhere in the repository could ride
   along with an approved or covered commit. The covered-commit check, `pre-commit` and
   `reference-transaction` now refuse any change outside the project.
+- **Security:** `gh` runs outside the sandbox, so the sandbox never limited where it writes,
+  and Keel's gh rules let `gh run download`, `gh release download`, `gh repo clone`,
+  `gh gist clone`, `gh repo fork --clone` and `gh codespace cp` write anywhere — into
+  `.keel/state/` (which the end-of-turn audit does not read), a guardrail folder or the home
+  directory. Their targets now meet the sandbox's limit (the project or a temporary folder)
+  and the same checks as `cp` or `tar -C`; options they pass to git or scp are refused.
 - The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
   does not ask for a new sandbox test.
 
