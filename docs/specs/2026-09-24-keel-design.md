@@ -238,7 +238,7 @@ Every gate re-derives authority from `approvals.jsonl` plus fresh content hashes
 - The agent cannot create approvals: the approve skill is user-only; `.keel/state/**` is denied to the Edit tool and to all Bash subprocesses (sandbox `denyWrite`); approval records are never accepted from any other source.
 - **Code before approval is blocked.** For T1/T2, Edit/Write to `paths.source` is denied unless the change is in `build` with a valid plan approval.
 - **Approvals are bound to content.** Editing an approved Intent or plan changes its hash; the approval is void and further source edits are blocked until it is re-approved.
-- **Commit** requires a `commit` approval whose hash equals the current staged diff.
+- **Commit** requires a `commit` approval whose hash equals the current staged diff, or, for a T1/T2 change, a cover by its approved plan: every staged file is the plan's (or in an approved scope), nothing is left unstaged, and the diff audit and end-of-turn checks pass. The Bash hook records the cover bound to that diff and its parent commit ([speed spec](2026-09-24-keel-speed.md) §2).
 - **Push / PR** require a one-time `pr` token (consumed on use), never to `project.protectedBranches`, never forced; merge, tag, release and promotion are denied to the agent entirely.
 - **Scope:** writing a source file outside the plan's declared files returns `ask` (the owner decides); `/keel:approve scope <glob>` extends the plan.
 

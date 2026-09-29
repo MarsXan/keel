@@ -21,7 +21,7 @@ It changes only through `/keel:amend` (owner approval and an ADR).
 - **R-1** MUST NOT change source or tests without an owner-approved plan for the active change.
   Why: code before agreement is rework.
   enforced-by: keel:edit-guard, keel:diff-audit
-- **R-2** MUST NOT commit anything the owner has not approved; an approval covers exactly the staged diff.
+- **R-2** MUST NOT commit anything the owner has not approved: either the owner approved exactly the staged diff, or the owner-approved plan covers it (only the plan's files, nothing left unstaged, the checks passing).
   Why: the owner decides what enters history.
   enforced-by: keel:bash-guard
 - **R-3** MUST NOT push or open a pull request without a one-time owner token; never push to a protected branch or force-push; never merge, tag or release.

@@ -19,7 +19,7 @@
 ## Red lines (full text in CONSTITUTION.md)
 
 - R-1 no source/test edits without an approved plan
-- R-2 no commit without an approval of exactly the staged diff
+- R-2 no commit unless the owner approved exactly the staged diff or the approved plan covers it
 - R-3 no push/PR without a one-time token; never protected branches, force, merge, tag or release
 - R-4 no weakened tests · R-5 no suppressions · R-7 respect line caps
 - R-6 guardrail files change only through /keel:amend

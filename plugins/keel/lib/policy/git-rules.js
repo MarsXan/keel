@@ -2,8 +2,9 @@
 /**
  * Git rules: every git invocation is parsed (global options, `-c` settings, aliases) and its
  * subcommand judged. Anything computed at run time or unknown fails closed; commits need an
- * approval bound to the staged diff, pushes a one-time token; history rewriting, hook
- * bypasses, configuration changes, merges and tags are the owner's alone.
+ * approval bound to the staged diff or the approved plan's cover, pushes a one-time token;
+ * history rewriting, hook bypasses, configuration changes, merges and tags are the owner's
+ * alone.
  */
 import { realPath, resolvePath } from '../paths.js';
 import { guardedWrite, pathGate } from './command-rules.js';

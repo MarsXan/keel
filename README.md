@@ -9,8 +9,9 @@ enforced by a tool the agent cannot edit, not by a prompt:
 - **No code before an approved plan.** Source and tests change only while the active change
   has an owner-approved plan, bound to a hash of that plan.
 - **The owner approves what enters history.** A commit needs an approval of exactly the staged
-  diff; a push or pull request needs a one-time token; merges, tags and releases are the
-  owner's alone.
+  diff, or the approved plan covers it (only the plan's files, nothing left unstaged, the
+  checks green); a push or pull request needs a one-time token; merges, tags and releases are
+  the owner's alone.
 - **Green means working.** No new suppressions, skipped or focused tests, deleted tests or
   fewer assertions; a turn cannot end until the diff audit and the project's checks pass.
 - **The guardrails protect themselves.** Guardrail files change only through an approved
@@ -125,7 +126,7 @@ workflow. Install it with `claude plugin install keel-nestjs@keel`, then run
 | Red line | Enforced by |
 |---|---|
 | R-1 no source/test edits without an approved plan | edit guard (Edit and shell writes), diff audit |
-| R-2 no commit without an approval of exactly the staged diff | bash guard, git hooks |
+| R-2 no commit unless the owner approved exactly the staged diff or the approved plan covers it | bash guard, git hooks |
 | R-3 no push/PR without a one-time token; never protected branches, force, merge, tag, release | bash guard, git hooks, deny rules |
 | R-4 no weakened tests | content policy, test freeze, diff audit |
 | R-5 no suppressions | content policy, diff audit |
