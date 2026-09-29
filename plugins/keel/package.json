@@ -1,6 +1,6 @@
 {
   "name": "keel-plugin",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Keel core plugin: the keel CLI, hooks, skills and templates",
   "type": "module",

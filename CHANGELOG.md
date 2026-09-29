@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.1 — gh and the sandbox
+
+Keel's settings run `gh` outside the sandbox so it can verify TLS, so only Keel's own gh
+rules stood between it and the files, secrets and programs the sandbox keeps out of reach.
+They now do the sandbox's job.
+
+- **Security:** `gh` runs outside the sandbox, so the sandbox never limited where it writes,
+  and Keel's gh rules let `gh run download`, `gh release download`, `gh repo clone`,
+  `gh gist clone`, `gh repo fork --clone` and `gh codespace cp` write anywhere — into
+  `.keel/state/` (which the end-of-turn audit does not read), a guardrail folder or the home
+  directory. Their targets now meet the sandbox's limit (the project or a temporary folder)
+  and the same checks as `cp` or `tar -C`; options they pass to git or scp are refused.
+- **Security:** a `name=@file` field sends the file (`gh api -F key=@.env --verbose` printed
+  it back), and the secret rule did not see the file in it; it does now, for `curl -F` too.
+  gh may not read a file whose name is computed at run time (`-F "k=@$F"`, `--input`,
+  `--body-file`), since outside the sandbox nothing else would check it.
+- **Security:** `GH_BROWSER="sh evil.sh" gh browse` ran a program of the agent's choice
+  outside the sandbox. gh may not be given the variables that choose its browser or editor
+  or where it reads its configuration (`GH_BROWSER`, `BROWSER`, `GH_EDITOR`, `EDITOR`,
+  `VISUAL`, `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `HOME`, `GH_PATH`); `GH_PAGER` names a plain
+  pager, like `PAGER`; `gh codespace ssh` passes no ssh options (`ProxyCommand` runs a
+  program) and writes its `--debug-file` only where any command may write.
+- gh may not do what the git rules refuse: `gh repo sync` (a pull, or with `--force` a hard
+  reset), `gh pr checkout --force` and `gh co --force` (a forced checkout), and
+  `gh repo fork --remote` (adding and renaming remotes).
+- R-2 in the README, the CLAUDE.md and constitution templates and the design spec names both
+  routes a commit may take: the owner's approval of exactly the staged diff, or the approved
+  plan's cover.
+- The workflow templates and Keel's own CI use the Node 24 majors of their actions
+  (`actions/checkout@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6`,
+  `actions/upload-artifact@v7`); GitHub deprecated Node 20 for actions. The audit template
+  turns off setup-node's automatic package-manager cache, which it would otherwise try for a
+  package manager the job never installs.
+
 ## 0.5.0 — speed (unreleased)
 
 Keel must raise development speed, maintenance speed and code quality together; these
@@ -27,11 +61,6 @@ changes remove waiting without removing a guarantee. Spec:
   slowest check), covered against individually approved commits, owner approvals per change,
   and the time from a change's start to its pull-request approval.
 - The Bash hook's timeout is 600 s, so a commit's checks can finish.
-- The workflow templates and Keel's own CI use the Node 24 majors of their actions
-  (`actions/checkout@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6`,
-  `actions/upload-artifact@v7`); GitHub deprecated Node 20 for actions. The audit template
-  turns off setup-node's automatic package-manager cache, which it would otherwise try for a
-  package manager the job never installs.
 
 ### Fixes from the 0.5 review
 - **Security:** `.keel/state/current.json`, which agent commands write, could name any file
@@ -42,25 +71,6 @@ changes remove waiting without removing a guarantee. Spec:
   hashes cover the project's own diff, so staged files elsewhere in the repository could ride
   along with an approved or covered commit. The covered-commit check, `pre-commit` and
   `reference-transaction` now refuse any change outside the project.
-- **Security:** `gh` runs outside the sandbox, so the sandbox never limited where it writes,
-  and Keel's gh rules let `gh run download`, `gh release download`, `gh repo clone`,
-  `gh gist clone`, `gh repo fork --clone` and `gh codespace cp` write anywhere — into
-  `.keel/state/` (which the end-of-turn audit does not read), a guardrail folder or the home
-  directory. Their targets now meet the sandbox's limit (the project or a temporary folder)
-  and the same checks as `cp` or `tar -C`; options they pass to git or scp are refused.
-- **Security:** a `name=@file` field sends the file (`gh api -F key=@.env --verbose` printed
-  it back), and the secret rule did not see the file in it; it does now, for `curl -F` too.
-  gh may not read a file whose name is computed at run time (`-F "k=@$F"`, `--input`,
-  `--body-file`), since outside the sandbox nothing else would check it.
-- **Security:** `GH_BROWSER="sh evil.sh" gh browse` ran a program of the agent's choice
-  outside the sandbox. gh may not be given the variables that choose its browser or editor
-  or where it reads its configuration (`GH_BROWSER`, `BROWSER`, `GH_EDITOR`, `EDITOR`,
-  `VISUAL`, `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `HOME`, `GH_PATH`); `GH_PAGER` names a plain
-  pager, like `PAGER`; `gh codespace ssh` passes no ssh options (`ProxyCommand` runs a
-  program) and writes its `--debug-file` only where any command may write.
-- gh may not do what the git rules refuse: `gh repo sync` (a pull, or with `--force` a hard
-  reset), `gh pr checkout --force` and `gh co --force` (a forced checkout), and
-  `gh repo fork --remote` (adding and renaming remotes).
 - The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
   does not ask for a new sandbox test.
 
