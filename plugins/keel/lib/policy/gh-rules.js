@@ -32,7 +32,10 @@ export function ghRule(cmd, ctx) {
   if (!group) return null;
   if (cmd.dynamic.slice(1, 3).some(Boolean)) return deny('The gh command or subcommand is computed at run time, so Keel cannot check it. Write it out literally.');
   if (!GH_TOP.has(group)) return deny(`gh ${group} is not a command Keel knows (it may be an alias or extension); use a built-in gh command.`);
-  const writes = localWrites(`${group} ${sub ?? ''}`, rest.map((word, i) => ({ word, dynamic: cmd.dynamic[i + 3] })));
+  const words = rest.map((word, i) => ({ word, dynamic: cmd.dynamic[i + 3] }));
+  const file = computedFile(group, words);
+  if (file) return deny(`gh reads ${file.word} as a file, and its name is computed at run time. gh runs outside the sandbox, so write the file name out for Keel to check it.`);
+  const writes = localWrites(`${group} ${sub ?? ''}`, words);
   if (writes && 'refuse' in writes) return deny(writes.refuse);
   if (writes) {
     const d = unsandboxedWrite(writes.targets, ctx, `gh ${group} ${sub}`);
@@ -95,6 +98,20 @@ function apiRule(args) {
   }
   if (hasFields && method === 'GET' && !args.some((a) => /^(-X|--method)/.test(a))) method = 'POST';
   return method === 'GET' || method === 'HEAD' ? null : deny(`gh api with ${method} changes GitHub state; ask the owner.`);
+}
+
+/**
+ * A file gh would read whose name is computed at run time: an `@file` field, or the value of
+ * an option that names a file (`-F` is `--body-file` for issues and pull requests). The secret
+ * rule checks the files it can name; gh runs outside the sandbox, so nothing else would.
+ * @param {string} group
+ * @param {Word[]} words the arguments after the subcommand
+ * @returns {Word | null}
+ */
+function computedFile(group, words) {
+  const options = ['--input', '--body-file', ...(group === 'pr' || group === 'issue' ? ['-F'] : [])];
+  const names = (/** @type {Word} */ w) => options.some((o) => (o.startsWith('--') ? w.word.startsWith(`${o}=`) : w.word.startsWith(o) && w.word !== o));
+  return words.find((w, i) => w.dynamic && (/^@|=@/.test(w.word) || options.includes(words[i - 1]?.word ?? '') || names(w))) ?? null;
 }
 
 /**

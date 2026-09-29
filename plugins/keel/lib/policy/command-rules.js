@@ -175,7 +175,8 @@ export function secretRule(cmd, name, ctx) {
   const args = SECRET_SAFE.has(name) ? [] : cmd.argv.slice(1).map((word, i) => ({ word, dynamic: cmd.dynamic[i + 1] }));
   for (const { word, dynamic } of [...inputs, ...args]) {
     const value = word.includes('=') && word.startsWith('-') ? word.slice(word.indexOf('=') + 1) : word;
-    const path = value.replace(/^@/, '');
+    const field = /^[^=@/]*=@([^;]+)/.exec(value); // `name=@file` sends the file (gh api -F, curl -F)
+    const path = (field ? field[1] : value).replace(/^@/, '');
     if (!path || path.startsWith('-')) continue;
     const candidates = dynamic ? expandGlob(path, ctx) : [resolvePath(ctx.cwd, path, ctx.home)];
     if (candidates.some((abs) => ctx.classify.isSecret(abs))) {

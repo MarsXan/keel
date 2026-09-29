@@ -43,6 +43,10 @@ changes remove waiting without removing a guarantee. Spec:
   `.keel/state/` (which the end-of-turn audit does not read), a guardrail folder or the home
   directory. Their targets now meet the sandbox's limit (the project or a temporary folder)
   and the same checks as `cp` or `tar -C`; options they pass to git or scp are refused.
+- **Security:** a `name=@file` field sends the file (`gh api -F key=@.env --verbose` printed
+  it back), and the secret rule did not see the file in it; it does now, for `curl -F` too.
+  gh may not read a file whose name is computed at run time (`-F "k=@$F"`, `--input`,
+  `--body-file`), since outside the sandbox nothing else would check it.
 - The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
   does not ask for a new sandbox test.
 
