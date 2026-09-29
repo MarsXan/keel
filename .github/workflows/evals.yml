@@ -34,9 +34,9 @@ jobs:
             echo "skip=1" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.key.outputs.skip != '1'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - if: steps.key.outputs.skip != '1'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
       # Bash-granting runs need Claude Code's OS sandbox: bubblewrap and socat, and user
@@ -59,7 +59,7 @@ jobs:
             --runs "$RUNS" --max-cost-usd "$MAX_COST" --threshold 0.8 \
             --json "$GITHUB_WORKSPACE/eval-results.json"
       - if: always() && steps.key.outputs.skip != '1'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-results
           path: eval-results.json

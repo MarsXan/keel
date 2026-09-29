@@ -16,12 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # hotspots and fix share read the history
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          # The audit installs nothing; without this, a packageManager field in package.json
+          # makes setup-node cache a package manager this job never installs.
+          package-manager-cache: false
       - name: Fetch the Keel CLI (outside the workspace)
         env:
           KEEL_REPOSITORY: ${{ vars.KEEL_REPOSITORY }}
@@ -32,7 +35,7 @@ jobs:
         run: |
           node "$RUNNER_TEMP/keel-cli/plugins/keel/bin/keel" audit --metrics > keel-audit.md
           cat keel-audit.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: keel-audit
           path: keel-audit.md

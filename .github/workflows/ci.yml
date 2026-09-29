@@ -16,13 +16,13 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
       - name: Install dev tools (typescript, node types)
         run: npm install --no-audit --no-fund
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: fixtures/nestjs-sample/package.json
       - name: Install the fixture monorepo (keel-nestjs canaries run against it)

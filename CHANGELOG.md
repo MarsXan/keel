@@ -27,6 +27,11 @@ changes remove waiting without removing a guarantee. Spec:
   slowest check), covered against individually approved commits, owner approvals per change,
   and the time from a change's start to its pull-request approval.
 - The Bash hook's timeout is 600 s, so a commit's checks can finish.
+- The workflow templates and Keel's own CI use the Node 24 majors of their actions
+  (`actions/checkout@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6`,
+  `actions/upload-artifact@v7`); GitHub deprecated Node 20 for actions. The audit template
+  turns off setup-node's automatic package-manager cache, which it would otherwise try for a
+  package manager the job never installs.
 
 ### Fixes from the 0.5 review
 - **Security:** `.keel/state/current.json`, which agent commands write, could name any file
