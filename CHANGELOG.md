@@ -53,6 +53,9 @@ changes remove waiting without removing a guarantee. Spec:
   `VISUAL`, `GH_CONFIG_DIR`, `XDG_CONFIG_HOME`, `HOME`, `GH_PATH`); `GH_PAGER` names a plain
   pager, like `PAGER`; `gh codespace ssh` passes no ssh options (`ProxyCommand` runs a
   program) and writes its `--debug-file` only where any command may write.
+- gh may not do what the git rules refuse: `gh repo sync` (a pull, or with `--force` a hard
+  reset), `gh pr checkout --force` and `gh co --force` (a forced checkout), and
+  `gh repo fork --remote` (adding and renaming remotes).
 - The sandbox settings fingerprint ignores key order, so a settings file Claude Code rewrote
   does not ask for a new sandbox test.
 

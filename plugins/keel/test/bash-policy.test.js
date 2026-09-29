@@ -201,6 +201,15 @@ test('gh starts no program the agent chose: no browser, editor, pager or configu
   }
 });
 
+test('gh may not do what the git rules refuse: pull, force a checkout, rewrite remotes', () => {
+  for (const c of ['gh repo sync', 'gh repo sync --force', 'gh repo sync owner/fork -b main', 'gh pr checkout 3 --force', 'gh pr checkout 3 -f', 'gh co 3 --force', 'gh repo fork --remote', 'gh repo fork owner/x --clone --remote=true']) {
+    assert.equal(decide(c, both), 'deny', c);
+  }
+  for (const c of ['gh pr checkout 3', 'gh pr checkout 3 -b review-3', 'gh co 3', 'gh pr checkout 3 --force=false', 'gh repo fork owner/x', 'gh repo fork --remote=false', 'git fetch origin']) {
+    assert.equal(decide(c, both), 'allow', c);
+  }
+});
+
 test('destructive git commands are denied; read-only forms are allowed', () => {
   for (const c of [
     'git reset --hard HEAD~1',

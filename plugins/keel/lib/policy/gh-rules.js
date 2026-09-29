@@ -26,6 +26,8 @@ const TEMP = ['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/'
 const GH_ENV = /^(GH_BROWSER|BROWSER|GH_EDITOR|EDITOR|VISUAL|GH_CONFIG_DIR|XDG_CONFIG_HOME|HOME|GH_PATH)$/;
 /** @type {Word} */
 const HERE = { word: '.', dynamic: false };
+/** Options of gh repo fork that take a value. */
+const FORK_VALUED = ['--remote-name', '--fork-name', '--org'];
 
 /**
  * @param {SimpleCommand} cmd
@@ -59,11 +61,15 @@ export function ghRule(cmd, ctx) {
           ? allowUsing([{ what: 'pr', action: 'pr-create' }])
           : deny('Opening a pull request needs the owner\'s one-time token: ask them to type /keel:approve pr.');
       }
-      return null;
+      return sub === 'checkout' ? forcedCheckout(words) : null;
+    case 'co': // gh's alias for pr checkout
+      return forcedCheckout(sub === undefined ? words : [{ word: sub, dynamic: false }, ...words]);
     case 'release':
       return readOnly(['list', 'view', 'download']);
     case 'repo':
-      return readOnly(['view', 'list', 'clone', 'fork', 'set-default', 'sync']);
+      if (sub === 'sync') return deny('gh repo sync updates a branch by merging into it or, with --force, resetting it (like git pull or git reset --hard); that is the owner\'s call. Use git fetch to see what changed.');
+      if (sub === 'fork' && isSet(parseArgs(words, FORK_VALUED), '--remote')) return deny('gh repo fork --remote adds and renames git remotes, which changes the repository configuration; that is the owner\'s call. Fork without --remote.');
+      return readOnly(['view', 'list', 'clone', 'fork', 'set-default']);
     case 'secret':
     case 'variable':
     case 'ruleset':
@@ -150,7 +156,7 @@ function localWrites(command, words) {
       return { targets: [a.operands[1] ?? cloneDir(a.operands[0])], hint: `Clone into a new folder of its own: gh ${command} <source> <dir>.` };
     }
     case 'repo fork': {
-      const a = parseArgs(words, ['--remote-name', '--fork-name', '--org']);
+      const a = parseArgs(words, FORK_VALUED);
       const clone = all(a, '--clone').at(-1);
       if (!clone || clone.word === 'false' || a.operands.length === 0) return null;
       if (a.passthrough.length > 0) return { refuse: 'gh repo fork --clone passes options to git clone, which runs outside the sandbox; clone without them.' };
@@ -213,6 +219,20 @@ function parseArgs(words, valued) {
 
 /** Every value given for any of the flags. @param {GhArgs} a @param {...string} flags */
 const all = (a, ...flags) => flags.flatMap((f) => a.values.get(f) ?? []);
+
+/** Whether a boolean flag is switched on (given, and not as `=false`). @param {GhArgs} a @param {...string} flags */
+const isSet = (a, ...flags) => all(a, ...flags).some((v) => v.word !== 'false');
+
+/**
+ * `gh pr checkout --force` resets the local branch to the pull request, discarding what the
+ * branch held, like `git checkout -f`.
+ * @param {Word[]} words the arguments after `pr checkout`
+ * @returns {Decision | null}
+ */
+function forcedCheckout(words) {
+  const a = parseArgs(words, ['-b', '--branch', '-R', '--repo']);
+  return isSet(a, '-f', '--force') ? deny('gh pr checkout --force resets a local branch and can discard work, like git checkout -f; check the pull request out without --force, or ask the owner.') : null;
+}
 
 /** The folder a clone creates by default: the last part of the repository or gist name. @param {Word} source */
 const cloneDir = (source) => ({ word: source.word.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).pop() ?? '', dynamic: source.dynamic });
